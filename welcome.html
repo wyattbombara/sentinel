@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Sentinel is ready</title>
 <meta name="robots" content="noindex">
-<link rel="icon" href="/assets/img/favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="/assets/css/sentinel.css">
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/css/sentinel.css">
 </head>
 <body>
 
@@ -19,14 +19,14 @@
 
 <header class="site-header">
   <div class="wrap site-header__inner">
-    <a class="brand" href="/">
+    <a class="brand" href="index.html">
       <svg class="brand__mark" viewBox="0 0 64 64" aria-hidden="true"><use href="#mask"/></svg>
       <span class="brand__name">Sentinel</span>
     </a>
     <nav class="nav">
-      <a href="/#how">How it works</a>
-      <a href="/#legend">The masks</a>
-      <a href="/download">Download</a>
+      <a href="index.html#how">How it works</a>
+      <a href="index.html#legend">The masks</a>
+      <a href="download.html">Download</a>
     </nav>
     <div class="header-actions" data-auth-slot></div>
   </div>
@@ -65,7 +65,7 @@
         <b>usps tracking</b> or <b>metamask wallet</b> &mdash; and watch the masks appear.
       </p>
       <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:6px">
-        <a class="btn btn--gold" href="/app">Open your dashboard</a>
+        <a class="btn btn--gold" href="app.html">Open your dashboard</a>
         <a class="btn btn--ghost" href="https://www.google.com/search?q=paypal+login" target="_blank" rel="noopener">Run a test search</a>
       </div>
     </div>
@@ -75,7 +75,7 @@
       <p class="muted small" style="margin:0">
         Open the Sentinel popup from your toolbar and check that you are signed in. If the
         extension was loaded unpacked, its ID is unique to your machine &mdash; see the note
-        at the bottom of the <a href="/download">download page</a> to pair it with this site.
+        at the bottom of the <a href="download.html">download page</a> to pair it with this site.
       </p>
     </div>
   </div>
@@ -85,22 +85,22 @@
 <footer class="site-footer">
   <div class="wrap site-footer__grid">
     <div>
-      <a class="brand" href="/">
+      <a class="brand" href="index.html">
         <svg class="brand__mark" viewBox="0 0 64 64" aria-hidden="true"><use href="#mask"/></svg>
         <span class="brand__name">Sentinel</span>
       </a>
     </div>
     <nav>
-      <a href="/download">Download</a>
-      <a href="/app">Dashboard</a>
-      <a href="/privacy">Privacy</a>
-      <a href="/terms">Terms</a>
+      <a href="download.html">Download</a>
+      <a href="app.html">Dashboard</a>
+      <a href="privacy.html">Privacy</a>
+      <a href="terms.html">Terms</a>
     </nav>
   </div>
 </footer>
 
-<script src="/assets/js/config.js"></script>
-<script src="/assets/js/sentinel.js"></script>
+<script src="assets/js/config.js"></script>
+<script src="assets/js/sentinel.js"></script>
 <script>
   Sentinel.paintHeader();
   if (Sentinel.qs('paired')) {

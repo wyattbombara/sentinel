@@ -1,7 +1,22 @@
 <!doctype html>
 <html lang="en">
 <head>
-<!-- @include head -->
+<meta charset="utf-8">
+<script src="assets/js/boot.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0b0d">
+<meta name="color-scheme" content="dark">
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/img/icon-192.png">
+<link rel="manifest" href="manifest.webmanifest.html">
+<link rel="preload" href="assets/fonts/geist-normal-300-700.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="assets/fonts/instrument-serif-normal-400.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="assets/css/sentinel.css">
+<meta property="og:site_name" content="Sentinel">
+<meta property="og:type" content="website">
+<meta property="og:image" content="https://www.sentinelscan.com/assets/img/og.png">
+<meta name="twitter:card" content="summary_large_image">
+
 <title>Sentinel — See the scam before you click</title>
 <meta name="description" content="Sentinel marks scams, viruses and malware on every search result, email and download with a colour-coded mask — before you click.">
 <meta property="og:title" content="Sentinel — See the scam before you click">
@@ -9,7 +24,29 @@
 <meta property="og:url" content="https://www.sentinelscan.com/">
 </head>
 <body>
-<!-- @include nav -->
+<header class="nav" data-nav>
+  <div class="wrap nav__inner">
+    <a class="logo" href="index.html" aria-label="Sentinel home">
+      <span class="logo__mark"><svg viewBox="0 0 64 64" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M32 5c13.2 0 23 4.3 23 10.8 0 15.8-7.4 36.6-23 43.9C16.4 52.4 9 31.6 9 15.8 9 9.3 18.8 5 32 5ZM22.2 25.4c-3 0-5.1 2-5.1 4.7s2.1 4.7 5.1 4.7 5.1-2 5.1-4.7-2.1-4.7-5.1-4.7ZM41.8 25.4c-3 0-5.1 2-5.1 4.7s2.1 4.7 5.1 4.7 5.1-2 5.1-4.7-2.1-4.7-5.1-4.7ZM21.6 40.4c2.9 4.4 6.4 6.6 10.4 6.6s7.5-2.2 10.4-6.6c.6-.9 1.9-1.2 2.8-.6.9.6 1.2 1.9.6 2.8-3.7 5.6-8.3 8.4-13.8 8.4s-10.1-2.8-13.8-8.4c-.6-.9-.3-2.2.6-2.8.9-.6 2.2-.3 2.8.6Z"/></svg></span>
+      Sentinel
+    </a>
+    <nav class="nav__links" aria-label="Main">
+      <a href="index.html#masks">The masks</a>
+      <a href="index.html#how">How it works</a>
+      <a href="index.html#everywhere">Protection</a>
+      <a href="pricing.html">Pricing</a>
+      <a href="index.html#security">Security</a>
+    </nav>
+    <div class="nav__actions" data-auth-actions>
+      <a class="btn btn--ghost btn--sm" href="login.html">Sign in</a>
+      <a class="btn btn--gold btn--sm" href="download.html">Download</a>
+    </div>
+    <button class="nav__toggle" type="button" aria-label="Menu" aria-expanded="false" data-nav-toggle>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 8h16M4 16h16"/></svg>
+    </button>
+  </div>
+</header>
+
 
 <main>
 
@@ -26,11 +63,11 @@
           in your inbox and in your downloads&nbsp;&mdash; before a single click.
         </p>
         <div class="hero__cta" data-reveal style="--d:.65s">
-          <a class="btn btn--gold btn--lg" href="/download">
+          <a class="btn btn--gold btn--lg" href="download.html">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11m0 0 4.5-4.5M12 15l-4.5-4.5M5 20h14"/></svg>
             Download Sentinel
           </a>
-          <a class="btn btn--lg" href="/app">Open in your browser <span class="arrow">&rarr;</span></a>
+          <a class="btn btn--lg" href="app.html">Open in your browser <span class="arrow">&rarr;</span></a>
         </div>
         <p class="hero__fine" data-reveal style="--d:.8s"><span>Free plan, no card</span><span>Works with Chrome, Edge &amp; Brave</span><span>Gmail &amp; Outlook</span></p>
       </div>
@@ -271,7 +308,53 @@
         <h2 data-split>Simple plans.<br><span class="serif italic">Serious protection.</span></h2>
         <p data-reveal>Start free. Upgrade when you want Sentinel watching in real time.</p>
       </div>
-      <!-- @include pricing -->
+      <div class="pricing" data-pricing>
+  <article class="plan" data-reveal>
+    <div class="plan__name">Free</div>
+    <div class="plan__price"><b>$0</b><span>forever</span></div>
+    <p class="plan__desc">Check any link or file you&rsquo;re unsure about.</p>
+    <a class="btn btn--block" href="signup.html" data-plan-cta="free">Create free account</a>
+    <ul class="plan__list">
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 5 5 9-10"/></svg><span><b>10</b> link scans a week</span></li>
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 5 5 9-10"/></svg><span><b>5</b> virus &amp; malware scans a week</span></li>
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 5 5 9-10"/></svg><span>Known-threat lookup + full checklist</span></li>
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 5 5 9-10"/></svg><span>Scam mask on link scans</span></li>
+      <li class="off"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 12h12"/></svg><span>No live scanning or research</span></li>
+    </ul>
+  </article>
+
+  <article class="plan plan--featured" data-reveal style="--d:.08s">
+    <span class="plan__badge">Most popular</span>
+    <div class="plan__name">Pro</div>
+    <div class="plan__price"><b>$6</b><span>/ month</span></div>
+    <p class="plan__desc">Live masks while you search and read email.</p>
+    <a class="btn btn--gold btn--block" href="signup.html?plan=pro" data-plan-cta="pro">Get Pro</a>
+    <ul class="plan__list">
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 5 5 9-10"/></svg><span><b>24 hours</b> of live scanning a week</span></li>
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 5 5 9-10"/></svg><span><b>40</b> researched link scans a week</span></li>
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 5 5 9-10"/></svg><span><b>40</b> virus &amp; malware scans a week</span></li>
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 5 5 9-10"/></svg><span>All three masks: scam, virus, malware</span></li>
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 5 5 9-10"/></svg><span>Email protection in Gmail &amp; Outlook</span></li>
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 5 5 9-10"/></svg><span>Download protection in the app</span></li>
+    </ul>
+  </article>
+
+  <article class="plan" data-reveal style="--d:.16s">
+    <div class="plan__name">Max</div>
+    <div class="plan__price"><b>$14</b><span>/ month</span></div>
+    <p class="plan__desc">Every result researched. Every email checkable.</p>
+    <a class="btn btn--block" href="signup.html?plan=max" data-plan-cta="max">Get Max</a>
+    <ul class="plan__list">
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 5 5 9-10"/></svg><span><b>96 hours</b> of live scanning a week</span></li>
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 5 5 9-10"/></svg><span><b>Research on every live result</b></span></li>
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 5 5 9-10"/></svg><span><b>100</b> researched link scans a week</span></li>
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 5 5 9-10"/></svg><span><b>100</b> virus &amp; malware scans a week</span></li>
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 5 5 9-10"/></svg><span>Paste any email in for a full scan</span></li>
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 5 5 9-10"/></svg><span>Everything in Pro</span></li>
+    </ul>
+  </article>
+</div>
+
     </div>
   </section>
 
@@ -348,16 +431,58 @@
         <h2 data-split>Stop guessing <span class="serif italic gold-text">which link is safe.</span></h2>
         <p>Free to start. Up and running in two minutes.</p>
         <div class="hero__cta">
-          <a class="btn btn--gold btn--lg" href="/download">Download Sentinel</a>
-          <a class="btn btn--lg" href="/signup">Create free account</a>
+          <a class="btn btn--gold btn--lg" href="download.html">Download Sentinel</a>
+          <a class="btn btn--lg" href="signup.html">Create free account</a>
         </div>
       </div>
     </div>
   </section>
 </main>
 
-<!-- @include footer -->
-<script src="/assets/js/masks.js"></script>
-<script src="/assets/js/site.js"></script>
+<footer class="footer">
+  <div class="wrap">
+    <div class="footer__grid">
+      <div class="footer__brand">
+        <a class="logo" href="index.html">
+          <span class="logo__mark"><svg viewBox="0 0 64 64" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M32 5c13.2 0 23 4.3 23 10.8 0 15.8-7.4 36.6-23 43.9C16.4 52.4 9 31.6 9 15.8 9 9.3 18.8 5 32 5ZM22.2 25.4c-3 0-5.1 2-5.1 4.7s2.1 4.7 5.1 4.7 5.1-2 5.1-4.7-2.1-4.7-5.1-4.7ZM41.8 25.4c-3 0-5.1 2-5.1 4.7s2.1 4.7 5.1 4.7 5.1-2 5.1-4.7-2.1-4.7-5.1-4.7ZM21.6 40.4c2.9 4.4 6.4 6.6 10.4 6.6s7.5-2.2 10.4-6.6c.6-.9 1.9-1.2 2.8-.6.9.6 1.2 1.9.6 2.8-3.7 5.6-8.3 8.4-13.8 8.4s-10.1-2.8-13.8-8.4c-.6-.9-.3-2.2.6-2.8.9-.6 2.2-.3 2.8.6Z"/></svg></span>
+          Sentinel
+        </a>
+        <p>Scam, virus and malware protection that shows you the danger before you click.</p>
+      </div>
+      <div>
+        <h5>Product</h5>
+        <ul>
+          <li><a href="download.html">Download</a></li>
+          <li><a href="app.html">Web app</a></li>
+          <li><a href="pricing.html">Pricing</a></li>
+          <li><a href="index.html#how">How it works</a></li>
+        </ul>
+      </div>
+      <div>
+        <h5>Account</h5>
+        <ul>
+          <li><a href="signup.html">Create account</a></li>
+          <li><a href="login.html">Sign in</a></li>
+          <li><a href="app.html#security">Security settings</a></li>
+        </ul>
+      </div>
+      <div>
+        <h5>Company</h5>
+        <ul>
+          <li><a href="privacy.html">Privacy</a></li>
+          <li><a href="terms.html">Terms</a></li>
+          <li><a href="mailto:support@sentinelscan.com">Support</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer__base">
+      <span>&copy; <span data-year>2026</span> Sentinel. All rights reserved.</span>
+      <span class="mono">www.sentinelscan.com</span>
+    </div>
+  </div>
+</footer>
+
+<script src="assets/js/masks.js"></script>
+<script src="assets/js/site.js"></script>
 </body>
 </html>
