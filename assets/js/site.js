@@ -205,12 +205,46 @@
   for (const card of $$('[data-trio]')) {
     const colors = { yellow: 'var(--yellow)', orange: 'var(--orange)', red: 'var(--red)' };
     const buttons = $$('[data-sev]', card);
-    buttons.forEach((b) => b.addEventListener('click', () => {
+    const cycle = document.createElement('button');
+    cycle.type = 'button';
+    cycle.className = 'severity-cycle';
+    cycle.dataset.cycle = '';
+    cycle.textContent = 'Cycle stages';
+    const name = $('h3', card).textContent;
+    cycle.setAttribute('aria-label', `Cycle ${name} stages`);
+    card.append(cycle);
+    let timer = null;
+
+    const select = (b) => {
       buttons.forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
       card.style.setProperty('--c', colors[b.dataset.sev]);
       card.dataset.severity = b.dataset.sev;
       paintGlyphs(card);
+    };
+    const pause = () => {
+      clearInterval(timer);
+      timer = null;
+      card.dataset.cycling = 'false';
+      cycle.textContent = 'Resume cycle';
+      cycle.setAttribute('aria-label', `Resume ${name} cycle`);
+    };
+    const start = () => {
+      clearInterval(timer);
+      card.dataset.cycling = 'true';
+      cycle.textContent = 'Pause cycle';
+      cycle.setAttribute('aria-label', `Pause ${name} cycle`);
+      timer = setInterval(() => {
+        const current = buttons.findIndex((b) => b.dataset.sev === card.dataset.severity);
+        select(buttons[(current + 1) % buttons.length]);
+      }, 2500);
+    };
+    buttons.forEach((b) => b.addEventListener('click', () => {
+      select(b);
+      start();
     }));
+    cycle.addEventListener('click', () => { if (timer !== null) pause(); else start(); });
+    document.addEventListener('visibilitychange', () => { if (document.hidden && timer !== null) pause(); });
+    addEventListener('pagehide', () => { if (timer !== null) pause(); });
   }
 
   /* ---------------------------------------------------- download picker */

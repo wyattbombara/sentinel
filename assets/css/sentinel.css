@@ -427,6 +427,8 @@ p { text-wrap: pretty; }
 .severity button[aria-pressed="true"] { color: #15130d; background: var(--sc); box-shadow: none; }
 .severity button:hover { color: var(--text); }
 .severity button[aria-pressed="true"]:hover { color: #15130d; }
+.severity-cycle { margin-top: 12px; padding: 6px 0; border: 0; background: none; color: var(--text-2); font: 500 12px var(--sans); cursor: pointer; text-decoration: underline; text-underline-offset: 4px; }
+.severity-cycle:hover { color: var(--c); }
 
 /* -------------------------------------------------------------- pipeline */
 

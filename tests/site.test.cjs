@@ -118,3 +118,80 @@ test('sign-in ignores external or malformed return destinations', async () => {
     assert.equal(new URL(c.location.href, 'https://sentinel.test/site/login.html').href, 'https://sentinel.test/site/app.html', next);
   }
 });
+
+function severityPreview() {
+  const timers = new Map();
+  const events = {};
+  let sequence = 0;
+  const button = tone => ({
+    dataset: tone ? {sev:tone} : {}, attributes:{}, handlers:{},
+    setAttribute(key, value) {this.attributes[key] = value;},
+    addEventListener(name, handler) {this.handlers[name] = handler;},
+    click() {this.handlers.click();}
+  });
+  const cards = ['Scam','Virus','Malware'].map((name, index) => ({
+    dataset:{severity:['red','orange','yellow'][index]},
+    buttons:['yellow','orange','red'].map(button),
+    style:{setProperty(){}},
+    querySelector(){return {textContent:name};},
+    querySelectorAll(selector){return selector === '[data-sev]' ? this.buttons : [];},
+    append(control){this.control = control;}
+  }));
+  const document = {
+    hidden:false,
+    querySelector(){return null;},
+    querySelectorAll(selector){return selector === '[data-trio]' ? cards : [];},
+    createElement(){return button();},
+    addEventListener(name, handler){(events[name] ||= []).push(handler);}
+  };
+  const sandbox = {
+    document, window:{SentinelMasks:{paint(){}}},
+    matchMedia:()=>({matches:false}), navigator:{platform:'Win32',userAgent:''},
+    addEventListener:document.addEventListener,
+    setInterval(callback){const id = ++sequence; timers.set(id, callback); return id;},
+    clearInterval(id){timers.delete(id);}, clearTimeout(){},
+  };
+  vm.runInNewContext(read('assets/js/site.js'), sandbox);
+  return {cards, timers, document, events, tick(){[...timers.values()].forEach(callback=>callback());}};
+}
+
+test('severity cycles wrap, pause, resume and restart from the selected stage', () => {
+  const preview = severityPreview();
+  const card = preview.cards[0];
+  assert.equal(preview.timers.size, 0);
+  card.buttons[0].click();
+  assert.equal(card.dataset.severity, 'yellow');
+  assert.equal(card.control.textContent, 'Pause cycle');
+  for (const expected of ['orange','red','yellow']) {
+    preview.tick();
+    assert.equal(card.dataset.severity, expected);
+    assert.equal(card.buttons.filter(b=>b.attributes['aria-pressed']==='true').length, 1);
+  }
+  card.control.click();
+  preview.tick();
+  assert.equal(card.dataset.severity, 'yellow');
+  assert.equal(preview.timers.size, 0);
+  card.control.click();
+  preview.tick();
+  assert.equal(card.dataset.severity, 'orange');
+  card.buttons[2].click();
+  assert.equal(preview.timers.size, 1);
+  preview.tick();
+  assert.equal(card.dataset.severity, 'yellow');
+});
+
+test('each card cycles independently and hidden pages pause all active cycles', () => {
+  const preview = severityPreview();
+  preview.cards[0].buttons[0].click();
+  preview.cards[1].buttons[2].click();
+  preview.tick();
+  assert.deepEqual(preview.cards.map(c=>c.dataset.severity), ['orange','yellow','yellow']);
+  preview.cards[0].control.click();
+  assert.equal(preview.timers.size, 1);
+  preview.tick();
+  assert.deepEqual(preview.cards.map(c=>c.dataset.severity), ['orange','orange','yellow']);
+  preview.document.hidden = true;
+  preview.events.visibilitychange.forEach(callback=>callback());
+  assert.equal(preview.timers.size, 0);
+  assert.equal(preview.cards[1].control.textContent, 'Resume cycle');
+});
