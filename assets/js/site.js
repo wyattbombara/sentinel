@@ -6,6 +6,12 @@
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
   const Masks = window.SentinelMasks;
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // Render immediately on browsers without IntersectionObserver.
+  const Observer = window.IntersectionObserver || class {
+    constructor(callback) { this.callback = callback; }
+    observe(target) { setTimeout(() => this.callback([{ target, isIntersecting: true }]), 0); }
+    unobserve() {}
+  };
 
   /* ------------------------------------------------------------- glyphs */
 
@@ -24,22 +30,30 @@
     addEventListener('scroll', onScroll, { passive: true });
     onScroll();
     const toggle = $('[data-nav-toggle]');
+    const close = () => {
+      nav.classList.remove('is-open');
+      toggle?.setAttribute('aria-expanded', 'false');
+    };
     toggle && toggle.addEventListener('click', () => {
       const open = nav.classList.toggle('is-open');
       toggle.setAttribute('aria-expanded', String(open));
     });
-    $$('.nav__links a', nav).forEach((a) => a.addEventListener('click', () => nav.classList.remove('is-open')));
+    $$('a', nav).forEach((a) => a.addEventListener('click', close));
+    document.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Escape' && nav.classList.contains('is-open')) { close(); toggle?.focus(); }
+    });
+    document.addEventListener('click', (ev) => { if (!nav.contains(ev.target)) close(); });
   }
 
   $$('[data-year]').forEach((el) => { el.textContent = new Date().getFullYear(); });
 
   // Signed-in visitors get a direct way back into the app.
-  fetch('/api/v1/auth/me', { credentials: 'same-origin' })
+  if (window.SENTINEL_API_ENABLED) fetch('/api/v1/auth/me', { credentials: 'same-origin' })
     .then((r) => (r.ok ? r.json() : null))
     .then((me) => {
       const slot = $('[data-auth-actions]');
-      if (!me || !slot) return;
-      slot.innerHTML = '<a class="btn btn--gold btn--sm" href="/app">Open Sentinel</a>';
+      if (!me?.user || !slot) return;
+      slot.innerHTML = '<a class="btn btn--gold btn--sm" href="app.html">Open Sentinel</a>';
     })
     .catch(() => {});
 
@@ -76,7 +90,7 @@
 
   /* ------------------------------------------------------------ reveals */
 
-  const io = new IntersectionObserver((entries) => {
+  const io = new Observer((entries) => {
     for (const e of entries) {
       if (!e.isIntersecting) continue;
       e.target.classList.add('is-in');
@@ -104,8 +118,8 @@
 
   const counters = $$('[data-count]');
   if (counters.length) {
-    const live = fetch('/api/v1/threat-stats').then((r) => (r.ok ? r.json() : null)).catch(() => null);
-    const cio = new IntersectionObserver(async (entries) => {
+    const live = window.SENTINEL_API_ENABLED ? fetch('/api/v1/threat-stats').then((r) => (r.ok ? r.json() : null)).catch(() => null) : Promise.resolve(null);
+    const cio = new Observer(async (entries) => {
       const stats = await live;
       for (const e of entries) {
         if (!e.isIntersecting) continue;
@@ -175,11 +189,11 @@
     };
 
     let timer = null;
-    const sio = new IntersectionObserver((entries) => {
+    const sio = new Observer((entries) => {
       const visible = entries[0].isIntersecting;
       if (visible) {
         stage.classList.add('is-in');
-        if (!timer) { run(); timer = setInterval(run, 9000); }
+        if (!timer) { run(); if (!reduced) timer = setInterval(run, 9000); }
       } else if (timer) {
         clearInterval(timer);
         timer = null;
@@ -204,4 +218,5 @@
   const os = /Mac/i.test(navigator.platform) ? 'mac' : /Linux/i.test(navigator.platform) && !/Android/i.test(navigator.userAgent) ? 'linux' : 'windows';
   $$('[data-os-label]').forEach((el) => { el.textContent = { windows: 'Windows', mac: 'macOS', linux: 'Linux' }[os]; });
   $$('[data-os]').forEach((el) => { if (el.dataset.os === os) el.classList.add('is-current'); });
+  clearTimeout(window.sentinelRevealFallback);
 })();

@@ -5,19 +5,17 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Create your Sentinel account</title>
 <meta name="description" content="Create a free Sentinel account to switch on real-time scam checking in your browser.">
-<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="assets/img/sentinel.png" type="image/png">
 <link rel="stylesheet" href="assets/css/sentinel.css">
+<link rel="stylesheet" href="assets/css/pages.css">
 </head>
 <body>
 
-<div class="auth-page">
+<main class="auth-page">
   <div class="auth-card">
     <div class="center" style="margin-bottom:26px">
       <a class="brand" href="index.html" style="justify-content:center">
-        <svg class="brand__mark" viewBox="0 0 64 64" aria-hidden="true">
-          <path fill="currentColor" fill-rule="evenodd" d="M32 5c13.2 0 23 4.3 23 10.8 0 15.8-7.4 36.6-23 43.9C16.4 52.4 9 31.6 9 15.8 9 9.3 18.8 5 32 5Zm-9.8 20.4c-3 0-5.1 2-5.1 4.7s2.1 4.7 5.1 4.7 5.1-2 5.1-4.7-2.1-4.7-5.1-4.7Zm19.6 0c-3 0-5.1 2-5.1 4.7s2.1 4.7 5.1 4.7 5.1-2 5.1-4.7-2.1-4.7-5.1-4.7Z"/>
-          <path fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" d="M22.5 42.2c2.7 3.6 5.9 5.4 9.5 5.4s6.8-1.8 9.5-5.4"/>
-        </svg>
+        <img class="logo-image" src="assets/img/sentinel.png" width="40" height="40" alt="">
         <span class="brand__name">Sentinel</span>
       </a>
     </div>
@@ -26,9 +24,9 @@
       <h1 style="font-size:1.55rem;margin-bottom:6px">Create your account</h1>
       <p class="muted small" style="margin-bottom:24px">Free while Sentinel is in beta. No card required.</p>
 
-      <div id="note" hidden></div>
+      <div id="note" class="form-note" role="status">Accounts are coming soon. Sign-up and sign-in are not available yet.</div>
 
-      <button class="btn btn--block btn--google" id="google" type="button">
+      <button class="btn btn--block btn--google" id="google" type="button" disabled>
         <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
           <path fill="#4285F4" d="M45.1 24.5c0-1.6-.1-2.8-.4-4H24v7.3h12.1c-.2 2-1.6 5-4.5 7l6.9 5.3c4.1-3.8 6.6-9.4 6.6-15.6Z"/>
           <path fill="#34A853" d="M24 46c5.9 0 10.9-2 14.5-5.3l-6.9-5.3c-1.9 1.3-4.4 2.2-7.6 2.2-5.8 0-10.7-3.8-12.5-9.1l-7.1 5.5C8.1 41.1 15.5 46 24 46Z"/>
@@ -40,40 +38,40 @@
 
       <div class="or">or</div>
 
-      <form id="form" novalidate>
+      <form id="form"><fieldset id="authFields" disabled>
         <div class="field field--pair">
           <div>
             <label for="firstName">First name</label>
-            <input id="firstName" name="firstName" autocomplete="given-name" placeholder="Ada" required>
-            <span class="error" data-error="firstName"></span>
+            <input aria-describedby="error-firstName" id="firstName" name="firstName" autocomplete="given-name" placeholder="Ada" required>
+            <span class="error" id="error-firstName" data-error="firstName"></span>
           </div>
           <div>
             <label for="lastName">Last name <span class="optional">(optional)</span></label>
-            <input id="lastName" name="lastName" autocomplete="family-name" placeholder="Lovelace">
-            <span class="error" data-error="lastName"></span>
+            <input aria-describedby="error-lastName" id="lastName" name="lastName" autocomplete="family-name" placeholder="Lovelace">
+            <span class="error" id="error-lastName" data-error="lastName"></span>
           </div>
         </div>
 
         <div class="field">
           <label for="email">Email</label>
-          <input id="email" name="email" type="email" autocomplete="email" placeholder="you@example.com" required>
-          <span class="error" data-error="email"></span>
+          <input aria-describedby="error-email" id="email" name="email" type="email" autocomplete="email" placeholder="you@example.com" required>
+          <span class="error" id="error-email" data-error="email"></span>
         </div>
 
         <div class="field">
           <label for="password">Password</label>
-          <input id="password" name="password" type="password" autocomplete="new-password" placeholder="At least 8 characters" required>
-          <span class="error" data-error="password"></span>
+          <input aria-describedby="error-password" id="password" name="password" type="password" autocomplete="new-password" minlength="8" pattern="(?=.*[A-Za-z])(?=.*[0-9]).{8,}" placeholder="At least 8 characters" required>
+          <span class="error" id="error-password" data-error="password"></span>
           <span class="hint">8+ characters, with at least one letter and one number.</span>
         </div>
 
         <button class="btn btn--block btn--gold" type="submit" id="submit" style="margin-top:6px">Create account</button>
-      </form>
+      </fieldset></form>
     </div>
 
     <p class="auth-switch">Already have an account? <a href="login.html">Sign in</a></p>
   </div>
-</div>
+</main>
 
 <script src="assets/js/config.js"></script>
 <script src="assets/js/sentinel.js"></script>

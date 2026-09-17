@@ -7,25 +7,42 @@ window.Sentinel = (() => {
   /* --------------------------------------------------------------- fetch */
 
   async function api(path, { method = 'GET', body } = {}) {
-    const res = await fetch(API + path, {
-      method,
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'same-origin',
-      body: body ? JSON.stringify(body) : undefined
-    });
-
-    const text = await res.text();
-    let data = null;
-    try { data = text ? JSON.parse(text) : null; } catch { /* keep null */ }
-
-    if (!res.ok) {
-      const err = new Error((data && data.error && data.error.message) || `Request failed (${res.status})`);
-      err.status = res.status;
-      err.code = data && data.error && data.error.code;
-      err.errors = (data && data.error && data.error.errors) || {};
-      throw err;
+    if (!window.SENTINEL_API_ENABLED) {
+      throw Object.assign(new Error('This feature is coming soon. Sentinel accounts and online services are not available yet.'), { code: 'service_unavailable' });
     }
-    return data;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    try {
+      const res = await fetch(API + path, {
+        method,
+        signal: controller.signal,
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: body ? JSON.stringify(body) : undefined
+      });
+
+      const text = await res.text();
+      let data = null;
+      try { data = text ? JSON.parse(text) : null; } catch { /* keep null */ }
+
+      if (!res.ok) {
+        const err = new Error((data && data.error && data.error.message) || `Request failed (${res.status})`);
+        err.status = res.status;
+        err.code = data && data.error && data.error.code;
+        err.errors = (data && data.error && data.error.errors) || {};
+        throw err;
+      }
+      if (res.status !== 204 && (!data || typeof data !== 'object')) {
+        throw Object.assign(new Error('Sentinel could not load this feature. Please try again later.'), { code: 'invalid_response' });
+      }
+      return data;
+    } catch (err) {
+      if (err.name === 'AbortError') throw new Error('The request took too long. Please try again.');
+      if (err instanceof TypeError) throw new Error('Could not reach Sentinel. Check your connection and try again.');
+      throw err;
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 
   /* ---------------------------------------------------------------- masks */
@@ -53,8 +70,9 @@ window.Sentinel = (() => {
   /* ------------------------------------------------------------- verdicts */
 
   function verdictCard(verdict) {
-    const tone = verdict.badge || 'green';
+    const tone = Object.hasOwn(COLORS, verdict.badge) ? verdict.badge : 'green';
     const color = COLORS[tone];
+    const score = Number.isFinite(Number(verdict.score)) ? Math.max(0, Math.min(100, Number(verdict.score))) : 0;
     const reasons = (verdict.reasons || []).slice(0, 5);
     return `
       <div class="verdict-card">
@@ -65,12 +83,12 @@ window.Sentinel = (() => {
             <div class="verdict-card__host">${esc(verdict.host || verdict.url || '')}</div>
           </div>
         </div>
-        <div class="meter"><i style="width:${Math.max(4, verdict.score)}%;background:${color}"></i></div>
+        <div class="meter"><i style="width:${score}%;background:${color}"></i></div>
         <ul class="reasons">
           ${reasons.map((r) => `<li>${esc(r.text)}</li>`).join('') || '<li>Nothing suspicious about this address.</li>'}
         </ul>
         <p class="small muted" style="margin:14px 0 0">
-          Risk score ${verdict.score}/100 &middot; checked against ${esc((verdict.sources || ['heuristics']).join(', ').replace(/_/g, ' '))}
+          Risk score ${score}/100 &middot; checked against ${esc((verdict.sources || ['heuristics']).join(', ').replace(/_/g, ' '))}
         </p>
       </div>`;
   }
@@ -91,14 +109,16 @@ window.Sentinel = (() => {
   async function paintHeader() {
     const slot = document.querySelector('[data-auth-slot]');
     if (!slot) return null;
+    if (!window.SENTINEL_API_ENABLED) return null;
     try {
       const { user } = await api('/auth/me');
-      slot.innerHTML = `<a class="btn btn--sm btn--gold" href="/app">Open Sentinel</a>`;
+      if (!user) throw new Error('Not signed in');
+      slot.innerHTML = `<a class="btn btn--sm btn--gold" href="app.html">Open Sentinel</a>`;
       return user;
     } catch {
       slot.innerHTML = `
-        <a class="btn btn--sm btn--ghost" href="/login">Sign in</a>
-        <a class="btn btn--sm btn--gold" href="/signup">Get Sentinel</a>`;
+        <a class="btn btn--sm btn--ghost" href="login.html">Sign in</a>
+        <a class="btn btn--sm btn--gold" href="signup.html">Get Sentinel</a>`;
       return null;
     }
   }
@@ -114,6 +134,7 @@ window.Sentinel = (() => {
     try { ({ token } = await api('/auth/extension-token', { method: 'POST' })); } catch { return false; }
 
     return new Promise((resolve) => {
+      const timer = setTimeout(() => resolve(false), 1500);
       let remaining = ids.length;
       let paired = false;
       for (const id of ids) {
@@ -121,10 +142,10 @@ window.Sentinel = (() => {
           chrome.runtime.sendMessage(id, { type: 'sentinel:connect', token }, (res) => {
             void chrome.runtime.lastError;
             if (res && res.ok) paired = true;
-            if (--remaining === 0) resolve(paired);
+            if (--remaining === 0) { clearTimeout(timer); resolve(paired); }
           });
         } catch {
-          if (--remaining === 0) resolve(paired);
+          if (--remaining === 0) { clearTimeout(timer); resolve(paired); }
         }
       }
     });

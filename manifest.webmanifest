@@ -1,0 +1,9 @@
+{
+  "name": "Sentinel",
+  "short_name": "Sentinel",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0a0b0d",
+  "theme_color": "#0a0b0d",
+  "icons": [{ "src": "assets/img/sentinel.png", "sizes": "1254x1254", "type": "image/png", "purpose": "any" }]
+}

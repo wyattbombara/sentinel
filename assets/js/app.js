@@ -6,15 +6,38 @@
 
   const MARKS = { chatgpt: 'GPT', claude: 'Cl', gemini: 'Gm', deepseek: 'DS' };
   const state = { user: null, providers: [], active: null, chats: {} };
+  let workspaceTrigger = null;
+  const pendingChats = new Set();
+
+  function unavailable(message) {
+    document.getElementById('greeting').textContent = 'Dashboard preview';
+    document.getElementById('dashboardIntro').textContent = message;
+    document.getElementById('extTitle').textContent = 'Protection is not active';
+    document.getElementById('extNote').textContent = 'Live protection will be available when Sentinel launches.';
+    document.getElementById('accountTitle').textContent = 'Accounts coming soon';
+    document.getElementById('accountNote').textContent = 'Sign-in, reports and saved sites are not available yet.';
+    document.getElementById('recent').innerHTML = '<li class="empty">Activity will appear here once protection is available.</li>';
+    document.getElementById('overrides').innerHTML = '<li class="empty">Saved sites are not available yet.</li>';
+    for (const id of ['checkUrl', 'checkBtn', 'avatarBtn']) document.getElementById(id).disabled = true;
+    document.getElementById('avatarBtn').hidden = true;
+    document.getElementById('checkResult').innerHTML = '<p class="form-note" style="margin-top:18px">Link scanning is coming soon. No links are being checked.</p>';
+  }
 
   /* ---------------------------------------------------------------- boot */
 
   async function boot() {
+    wire();
+    if (!window.SENTINEL_API_ENABLED) {
+      unavailable('Explore the layout. Accounts, scanning and AI chat are coming soon.');
+      return;
+    }
     try {
       const { user } = await api('/auth/me');
+      if (!user) throw Object.assign(new Error('Please sign in.'), { status: 401 });
       state.user = user;
-    } catch {
-      location.href = '/login?next=' + encodeURIComponent('/app');
+    } catch (err) {
+      if (err.status === 401) location.href = 'login.html?next=app.html';
+      else unavailable(err.message);
       return;
     }
     paintUser();
@@ -22,11 +45,11 @@
     loadStats();
     loadOverrides();
     loadProviders();
-    wire();
   }
 
   function paintUser() {
     const u = state.user;
+    document.getElementById('accountTitle').textContent = 'Signed in';
     const initials = ((u.firstName || '?')[0] + (u.lastName ? u.lastName[0] : '')).toUpperCase();
     const avatar = document.getElementById('avatarBtn');
     if (u.avatarUrl) {
@@ -46,7 +69,10 @@
 
   async function loadStats() {
     let data;
-    try { data = await api('/stats'); } catch { return; }
+    try { data = await api('/stats'); } catch (err) {
+      document.getElementById('recent').innerHTML = `<li class="empty">${esc(err.message)}</li>`;
+      return;
+    }
     const c = data.counts;
     document.getElementById('tFlagged').textContent = data.flagged;
     document.getElementById('tYellow').textContent = c.suspicious;
@@ -67,7 +93,9 @@
   }
 
   function when(ts) {
-    const mins = Math.round((Date.now() - ts) / 60000);
+    const timestamp = typeof ts === 'number' ? ts : Date.parse(ts);
+    if (!Number.isFinite(timestamp)) return 'Unknown time';
+    const mins = Math.max(0, Math.floor((Date.now() - timestamp) / 60000));
     if (mins < 1) return 'just now';
     if (mins < 60) return `${mins}m ago`;
     const hours = Math.round(mins / 60);
@@ -77,9 +105,15 @@
 
   async function loadOverrides() {
     let data;
-    try { data = await api('/sites/overrides'); } catch { return; }
+    try { data = await api('/sites/overrides'); } catch (err) {
+      document.getElementById('overrides').innerHTML = `<li class="empty">${esc(err.message)}</li>`;
+      return;
+    }
     const list = document.getElementById('overrides');
-    if (!data.overrides.length) return;
+    if (!data.overrides.length) {
+      list.innerHTML = '<li class="empty">No overrides yet.</li>';
+      return;
+    }
     list.innerHTML = data.overrides.map((row) => `<li>
       <span class="list__host">${esc(row.host)}</span>
       <span class="list__time">${row.action === 'allow' ? 'trusted' : 'blocked'}</span>
@@ -89,8 +123,14 @@
     list.querySelectorAll('[data-clear]').forEach((button) => {
       button.onclick = async () => {
         button.disabled = true;
-        await api('/sites/override', { method: 'POST', body: { host: button.dataset.clear, action: 'clear' } });
-        loadOverrides();
+        try {
+          await api('/sites/override', { method: 'POST', body: { host: button.dataset.clear, action: 'clear' } });
+          await loadOverrides();
+        } catch (err) {
+          button.disabled = false;
+          button.textContent = 'Retry removal';
+          button.title = err.message;
+        }
       };
     });
   }
@@ -105,7 +145,7 @@
     const fail = () => {
       dot.style.background = 'var(--yellow)';
       title.textContent = 'Extension not detected';
-      note.innerHTML = 'Sentinel protects your browsing once the extension is installed. <a href="/download">Install it now</a>.';
+      note.innerHTML = 'Sentinel protects your browsing once the extension is installed. <a href="download.html">Install it now</a>.';
     };
 
     if (!ids.length || !window.chrome || !chrome.runtime || !chrome.runtime.sendMessage) { fail(); return; }
@@ -115,11 +155,11 @@
       try {
         chrome.runtime.sendMessage(id, { type: 'sentinel:ping' }, (res) => {
           void chrome.runtime.lastError;
-          if (answered || !res) return;
+          if (answered || !res?.ok) return;
           answered = true;
           dot.style.background = 'var(--green)';
-          title.textContent = 'Protection active';
-          note.textContent = 'Sentinel is checking search results and pages in this browser.';
+          title.textContent = 'Extension detected';
+          note.textContent = 'Open the extension to check its sign-in and protection status.';
         });
       } catch { /* ignore */ }
     }
@@ -136,6 +176,7 @@
 
     form.onsubmit = async (ev) => {
       ev.preventDefault();
+      if (button.disabled) return;
       const url = input.value.trim();
       if (!url) return;
       button.disabled = true;
@@ -151,7 +192,7 @@
             await api('/report', { method: 'POST', body: { url: verdict.url, category: 'phishing' } });
             report.textContent = 'Reported ✓';
             loadStats();
-          } catch (err) { report.textContent = err.message; }
+          } catch (err) { report.disabled = false; report.textContent = 'Retry report'; report.title = err.message; }
         };
       } catch (err) {
         out.innerHTML = `<div class="form-note form-note--error" style="margin-top:18px">${esc(err.message)}</div>`;
@@ -176,8 +217,10 @@
     });
 
     document.getElementById('signOut').onclick = async () => {
-      await api('/auth/logout', { method: 'POST' }).catch(() => {});
-      location.href = '/';
+      try {
+        await api('/auth/logout', { method: 'POST' });
+        location.href = 'index.html';
+      } catch (err) { document.getElementById('accountNote').textContent = err.message; }
     };
 
     document.getElementById('openWorkspace').onclick = openWorkspace;
@@ -188,6 +231,17 @@
     });
     document.addEventListener('keydown', (ev) => {
       if (ev.key === 'Escape' && !document.getElementById('overlay').hidden) closeWorkspace();
+      if (ev.key === 'Escape' && !menuPanel.hidden) {
+        menuPanel.hidden = true;
+        avatarBtn.setAttribute('aria-expanded', 'false');
+        avatarBtn.focus();
+      }
+      if (ev.key === 'Tab' && !document.getElementById('overlay').hidden) {
+        const items = [...document.getElementById('overlay').querySelectorAll('button:not(:disabled), a[href], input:not(:disabled), textarea:not(:disabled)')].filter((el) => el.getClientRects().length);
+        const first = items[0], last = items.at(-1);
+        if (ev.shiftKey && document.activeElement === first) { ev.preventDefault(); last.focus(); }
+        else if (!ev.shiftKey && document.activeElement === last) { ev.preventDefault(); first.focus(); }
+      }
     });
   }
 
@@ -203,12 +257,21 @@
       const data = await api('/ai/providers');
       state.providers = data.providers;
       renderTabs();
-    } catch { /* shown when the overlay opens */ }
+    } catch (err) {
+      document.getElementById('panes').innerHTML = `<p class="form-note" role="status">${esc(err.message)}</p>`;
+    }
   }
 
   function openWorkspace() {
+    workspaceTrigger = document.activeElement;
     document.getElementById('overlay').hidden = false;
+    document.querySelector('.app-shell').inert = true;
     document.body.style.overflow = 'hidden';
+    document.getElementById('wsClose').focus();
+    if (!state.user) {
+      document.getElementById('panes').innerHTML = '<p class="form-note">AI chat is coming soon. Connecting accounts and sending messages are not available yet.</p>';
+      return;
+    }
     if (!state.providers.length) loadProviders();
     else if (!state.active) selectTab(state.providers[0].id);
   }
@@ -216,11 +279,19 @@
   function closeWorkspace() {
     document.getElementById('overlay').hidden = true;
     document.body.style.overflow = '';
+    document.querySelector('.app-shell').inert = false;
+    workspaceTrigger?.focus();
   }
 
   function renderTabs() {
     const tabs = document.getElementById('tabs');
     const panes = document.getElementById('panes');
+    if (!state.providers.length) {
+      tabs.innerHTML = '';
+      panes.innerHTML = '<p class="form-note">No AI providers are available yet.</p>';
+      state.active = null;
+      return;
+    }
 
     tabs.innerHTML = state.providers.map((p) => `
       <button class="tab" role="tab" id="tab-${p.id}" data-tab="${p.id}"
@@ -237,7 +308,7 @@
       button.onclick = () => selectTab(button.dataset.tab);
     });
 
-    selectTab(state.active || state.providers[0].id);
+    selectTab(state.providers.some((p) => p.id === state.active) ? state.active : state.providers[0].id);
   }
 
   function selectTab(id) {
@@ -361,7 +432,9 @@
     form.onsubmit = async (ev) => {
       ev.preventDefault();
       const content = textarea.value.trim();
-      if (!content) return;
+      if (!content || pendingChats.has(p.id)) return;
+      pendingChats.add(p.id);
+      form.querySelector('button').disabled = true;
 
       history.push({ role: 'user', content });
       textarea.value = '';
@@ -386,12 +459,22 @@
           renderTabs();
           return;
         }
+      } finally {
+        pendingChats.delete(p.id);
+        form.querySelector('button').disabled = false;
       }
-      paint();
+      if (state.active === p.id) renderPane(p.id);
     };
 
     pane.querySelector('[data-disconnect]').onclick = async () => {
-      await api('/ai/disconnect', { method: 'POST', body: { provider: p.id } }).catch(() => {});
+      if (pendingChats.has(p.id)) return;
+      try {
+        await api('/ai/disconnect', { method: 'POST', body: { provider: p.id } });
+      } catch (err) {
+        history.push({ role: 'assistant', content: err.message, error: true });
+        paint();
+        return;
+      }
       p.connected = false;
       state.chats[p.id] = [];
       renderTabs();

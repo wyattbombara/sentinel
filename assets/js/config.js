@@ -8,6 +8,9 @@
  * The extension only accepts messages from origins listed in its manifest's
  * "externally_connectable" block, so this list cannot be abused by other sites.
  */
+// Keep false until the same-origin API described in SERVER-REPORT.md exists.
+window.SENTINEL_API_ENABLED = false;
+
 window.SENTINEL_EXTENSION_IDS = [
   // Chrome Web Store build (filled in at publish time):
   // 'abcdefghijklmnopabcdefghijklmnop',

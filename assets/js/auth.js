@@ -21,7 +21,7 @@ window.Auth = (() => {
   function showFieldErrors(errors) {
     let first = null;
     for (const [field, message] of Object.entries(errors || {})) {
-      const slot = document.querySelector(`[data-error="${field}"]`);
+      const slot = document.getElementById(`error-${field}`);
       const input = document.getElementById(field);
       if (slot) slot.textContent = message;
       if (input) { input.setAttribute('aria-invalid', 'true'); first = first || input; }
@@ -33,8 +33,14 @@ window.Auth = (() => {
   /** Where to land after a successful sign-in. */
   function destination() {
     const next = qs('next');
-    if (next && next.startsWith('/') && !next.startsWith('//')) return next;
-    return qs('from') === 'extension' ? '/welcome?paired=1' : '/app';
+    if (next) {
+      try {
+        const url = new URL(next, location.href);
+        const app = new URL('app.html', location.href);
+        if (url.origin === app.origin && url.pathname === app.pathname) return url.href;
+      } catch { /* use the default destination */ }
+    }
+    return qs('from') === 'extension' ? 'welcome.html' : 'app.html';
   }
 
   async function finish() {
@@ -65,6 +71,24 @@ window.Auth = (() => {
     const form = document.getElementById('form');
     const submit = document.getElementById('submit');
     const label = submit.textContent;
+    const plans = { free: ['Free', '$0'], pro: ['Pro', '$15/month'], max: ['Max', '$40/month'], ultimate: ['Ultimate', '$100/month'] };
+    const selectedPlan = qs('plan');
+    if (mode === 'signup' && Object.hasOwn(plans, selectedPlan)) {
+      const selected = plans[selectedPlan];
+      const summary = document.createElement('p');
+      summary.className = 'form-note';
+      summary.textContent = `${selected[0]} · ${selected[1]} — planned launch pricing. Subscriptions are not available yet.`;
+      form.before(summary);
+    }
+
+    if (!window.SENTINEL_API_ENABLED) {
+      note('Accounts are coming soon. Sign-up and sign-in are not available yet. <a href="app.html">Preview the dashboard</a>.', 'info');
+      form.addEventListener('submit', (ev) => ev.preventDefault());
+      return;
+    }
+    document.getElementById('authFields').disabled = false;
+    document.getElementById('google').disabled = false;
+    clearErrors();
 
     setupGoogle();
 
@@ -76,6 +100,7 @@ window.Auth = (() => {
 
     form.addEventListener('submit', async (ev) => {
       ev.preventDefault();
+      if (submit.disabled || !form.reportValidity()) return;
       clearErrors();
 
       const data = Object.fromEntries(new FormData(form).entries());

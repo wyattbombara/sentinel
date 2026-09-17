@@ -5,9 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Sentinel</title>
 <meta name="robots" content="noindex">
-<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="assets/img/sentinel.png" type="image/png">
 <link rel="stylesheet" href="assets/css/sentinel.css">
 <link rel="stylesheet" href="assets/css/app.css">
+<link rel="stylesheet" href="assets/css/pages.css">
 </head>
 <body>
 
@@ -22,7 +23,7 @@
 
   <header class="app-bar">
     <a class="brand" href="index.html">
-      <svg class="brand__mark" viewBox="0 0 64 64" aria-hidden="true"><use href="#mask"/></svg>
+      <img class="logo-image" src="assets/img/sentinel.png" width="40" height="40" alt="">
       <span class="brand__name">Sentinel</span>
     </a>
     <div class="app-bar__actions">
@@ -47,7 +48,7 @@
     <div class="app-head">
       <div>
         <h1 id="greeting">Welcome back</h1>
-        <p class="muted">Here is what Sentinel has caught for you in the last 30 days.</p>
+        <p class="muted" id="dashboardIntro">Your protection activity will appear here.</p>
       </div>
       <a class="btn btn--sm" href="download.html">Install the extension</a>
     </div>
@@ -72,9 +73,9 @@
             </div>
           </div>
           <div class="status-row">
-            <span class="status-row__dot" style="background:var(--green)"></span>
+            <span class="status-row__dot" style="background:var(--faint)"></span>
             <div>
-              <b>Account active</b>
+              <b id="accountTitle">Account status unavailable</b>
               <span id="accountNote">Your trusted sites and reports follow you across devices.</span>
             </div>
           </div>
