@@ -16,9 +16,7 @@
   /* ------------------------------------------------------------- glyphs */
 
   function paintGlyphs(root = document) {
-    for (const el of $$('[data-glyph]', root)) {
-      if (!el.firstElementChild) el.innerHTML = Masks.svg(el.dataset.glyph);
-    }
+    Masks.paint(root);
   }
   paintGlyphs();
 
@@ -151,7 +149,7 @@
         const [threat, color] = pair.split(':');
         const m = document.createElement('span');
         m.className = `m m--${color}`;
-        m.innerHTML = Masks.svg(threat);
+        m.innerHTML = Masks.svg(threat, '', color);
         slot.appendChild(m);
         return m;
       });
@@ -211,6 +209,7 @@
       buttons.forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
       card.style.setProperty('--c', colors[b.dataset.sev]);
       card.dataset.severity = b.dataset.sev;
+      paintGlyphs(card);
     }));
   }
 

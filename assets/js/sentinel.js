@@ -47,12 +47,10 @@ window.Sentinel = (() => {
 
   /* ---------------------------------------------------------------- masks */
 
-  const MASK_PATHS = `
-    <path fill="currentColor" fill-rule="evenodd" d="M32 5c13.2 0 23 4.3 23 10.8 0 15.8-7.4 36.6-23 43.9C16.4 52.4 9 31.6 9 15.8 9 9.3 18.8 5 32 5Zm-9.8 20.4c-3 0-5.1 2-5.1 4.7s2.1 4.7 5.1 4.7 5.1-2 5.1-4.7-2.1-4.7-5.1-4.7Zm19.6 0c-3 0-5.1 2-5.1 4.7s2.1 4.7 5.1 4.7 5.1-2 5.1-4.7-2.1-4.7-5.1-4.7Z"/>
-    <path fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" d="M22.5 42.2c2.7 3.6 5.9 5.4 9.5 5.4s6.8-1.8 9.5-5.4"/>`;
+  if (typeof document !== 'undefined') window.SentinelMasks.paint(document);
 
-  function mask(className = '') {
-    return `<svg viewBox="0 0 64 64" class="${className}" aria-hidden="true">${MASK_PATHS}</svg>`;
+  function mask(className = '', severity) {
+    return window.SentinelMasks.svg('scam', `class="${esc(className)}"`, severity);
   }
 
   const COLORS = { yellow: '#f5c542', orange: '#f08a24', red: '#e0413e', green: '#48b07a' };
@@ -64,7 +62,7 @@ window.Sentinel = (() => {
   };
 
   function badge(tone, label) {
-    return `<span class="mask-badge mask-badge--${tone}">${mask()}${label || LABELS[tone] || ''}</span>`;
+    return `<span class="mask-badge mask-badge--${esc(tone)}">${mask('', tone)}${esc(label || LABELS[tone] || '')}</span>`;
   }
 
   /* ------------------------------------------------------------- verdicts */
@@ -77,7 +75,7 @@ window.Sentinel = (() => {
     return `
       <div class="verdict-card">
         <div class="verdict-card__head">
-          <span class="verdict-card__mask" style="color:${color}">${mask()}</span>
+          <span class="verdict-card__mask" style="color:${color}">${mask('', tone)}</span>
           <div>
             <div class="verdict-card__level" style="color:${color}">${esc(verdict.label)}</div>
             <div class="verdict-card__host">${esc(verdict.host || verdict.url || '')}</div>

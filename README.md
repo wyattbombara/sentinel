@@ -6,7 +6,7 @@ To preview locally, run `python -m http.server 8765 --bind 127.0.0.1` from this 
 
 Run the dependency-free regression checks with `node --test tests/site.test.cjs` (Node 18 or later).
 
-The original supplied logo is `assets/img/sentinel.png`. Navigation, browser icons and the manifest use it. The three illustrated threat masks remain separate product illustrations.
+The original supplied logo is `assets/img/sentinel.png`. Navigation, browser icons, the manifest and every threat illustration use it. `assets/js/masks.js` adds severity cues: a normal yellow shield, angular orange details, and red horns. These variants are shared by the marketing demos, threat cards and dashboard verdicts.
 
 `assets/js/config.js` keeps online features disabled until a backend is implemented. See [SERVER-REPORT.md](SERVER-REPORT.md) for the existing API expectations and outstanding work. Keep this disabled until the API is ready; toggling it does not create a backend.
 

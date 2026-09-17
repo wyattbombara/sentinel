@@ -10,6 +10,8 @@ function context(fetch, enabled = true, href = 'https://sentinel.test/site/login
   const url = new URL(href);
   const sandbox = { window: { SENTINEL_API_ENABLED: enabled }, fetch, AbortController, setTimeout, clearTimeout, URL, URLSearchParams, location: url };
   vm.createContext(sandbox);
+  vm.runInContext(read('assets/js/masks.js'), sandbox);
+  sandbox.window.SentinelMasks = sandbox.SentinelMasks;
   vm.runInContext(read('assets/js/sentinel.js'), sandbox);
   return sandbox;
 }
@@ -48,6 +50,17 @@ test('verdict content is escaped and risk scores cannot inject HTML', () => {
   assert.ok(!html.includes('<img'));
   assert.ok(html.includes('Risk score 0/100'));
   assert.ok(c.window.Sentinel.verdictCard({score:999}).includes('Risk score 100/100'));
+});
+
+test('severity icons share the supplied logo and have distinct shapes', () => {
+  const c = context();
+  for (const [tone, variant] of [['yellow','normal'],['orange','angular'],['red','horned']]) {
+    const icon = c.window.Sentinel.mask('', tone);
+    assert.ok(icon.includes('assets/img/sentinel.png'));
+    assert.ok(icon.includes(`data-icon-variant="${variant}"`));
+    assert.equal(icon.includes('<path'), tone !== 'yellow');
+  }
+  assert.ok(c.window.Sentinel.badge('red', '<b>danger</b>').includes('&lt;b&gt;danger&lt;/b&gt;'));
 });
 
 test('all local HTML links, fragments and asset references resolve', () => {

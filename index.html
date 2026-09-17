@@ -134,7 +134,7 @@
 
         <div class="float float--verdict" data-float="verdict">
           <div class="verdict__head">
-            <div class="verdict__icon" data-glyph="scam"></div>
+            <div class="verdict__icon" data-glyph="scam" data-severity="red"></div>
             <div>
               <div class="verdict__title">Confirmed scam</div>
               <div class="verdict__host">paypa1-secure-login.com</div>
@@ -182,7 +182,7 @@
 
       <div class="trio" data-reveal="scale">
         <article class="mask-card" style="--c:var(--red)" data-trio data-severity="red">
-          <div class="mask-card__glyph"><img src="assets/img/sentinel.png" width="92" height="92" alt=""></div>
+          <div class="mask-card__glyph" data-glyph="scam"><img src="assets/img/sentinel.png" width="92" height="92" alt=""></div>
           <h3>Scam</h3>
           <p>Sites built to take your money, passwords or wallet.</p>
           <ul>
@@ -197,7 +197,7 @@
           </div>
         </article>
         <article class="mask-card" style="--c:var(--orange)" data-trio data-severity="orange">
-          <div class="mask-card__glyph"><img src="assets/img/sentinel.png" width="92" height="92" alt=""></div>
+          <div class="mask-card__glyph" data-glyph="virus"><img src="assets/img/sentinel.png" width="92" height="92" alt=""></div>
           <h3>Virus</h3>
           <p>Files that infect your computer the moment they run.</p>
           <ul>
@@ -212,7 +212,7 @@
           </div>
         </article>
         <article class="mask-card" style="--c:var(--yellow)" data-trio data-severity="yellow">
-          <div class="mask-card__glyph"><img src="assets/img/sentinel.png" width="92" height="92" alt=""></div>
+          <div class="mask-card__glyph" data-glyph="malware"><img src="assets/img/sentinel.png" width="92" height="92" alt=""></div>
           <h3>Malware</h3>
           <p>Pages and documents that attack from the inside.</p>
           <ul>
@@ -360,7 +360,7 @@
     <div class="plan__name">Max</div>
     <div class="plan__price"><b>$40</b><span>/ month</span></div>
     <p class="plan__desc">Every result researched. Every email checkable.</p>
-    <a class="btn btn--block" href="signup.html?plan=max" data-plan-cta="max">Get Max</a>
+    <a class="btn btn--gold btn--block" href="signup.html?plan=max" data-plan-cta="max">Get Max</a>
     <ul class="plan__list">
       <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 5 5 9-10"/></svg><span><b>96 hours</b> of live scanning a week</span></li>
       <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 5 5 9-10"/></svg><span><b>Research on every live result</b></span></li>

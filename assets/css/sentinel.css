@@ -407,7 +407,7 @@ p { text-wrap: pretty; }
 .mask-card:hover::before { opacity: 1; }
 .mask-card__glyph { width: 92px; height: 92px; color: var(--c); transition: color .5s var(--ease), transform .6s var(--ease); }
 .mask-card:hover .mask-card__glyph { transform: translateY(-4px) rotate(-3deg); }
-.mask-card__glyph svg { width: 100%; height: 100%; filter: drop-shadow(0 12px 30px color-mix(in srgb, var(--c) 35%, transparent)); }
+.mask-card__glyph svg { width: 100%; height: 100%; border-radius: 16px; filter: drop-shadow(0 12px 30px color-mix(in srgb, var(--c) 35%, transparent)); }
 .mask-card__glyph img { width: 100%; height: 100%; object-fit: contain; border-radius: 16px; }
 .mask-card[data-severity="yellow"] .mask-card__glyph img { filter: url('#sentinel-yellow'); }
 .mask-card[data-severity="orange"] .mask-card__glyph img { filter: url('#sentinel-orange'); }
@@ -438,6 +438,10 @@ p { text-wrap: pretty; }
 .pipeline.is-in .pipeline__rail i { right: 0; }
 @media (max-width: 960px) { .pipeline__rail { display: none; } }
 .step { position: relative; }
+.pipeline { row-gap: 0; }
+.pipeline > .step { display: grid; grid-template-rows: subgrid; grid-row: span 4; min-width: 0; }
+.pipeline .step__sample { min-height: 118px; overflow-wrap: anywhere; }
+@media (max-width: 960px) { .pipeline > .step { margin-bottom: 28px; } }
 .step__num {
   position: relative; z-index: 1;
   width: 46px; height: 46px; border-radius: 50%;

@@ -1,41 +1,44 @@
-/**
- * Sentinel's three masks - one per threat - shared by the web app and the
- * browser extension (the build copies this file into the extension).
- *
- *   scam     theatre mask with a smile          (the classic con)
- *   virus    mask ringed with spores            (infectious files)
- *   malware  horned mask with a jagged mouth    (hostile code)
- *
- * Features are cut out of the face (even-odd fill), so the glyph reads on any
- * background in a single colour: yellow, orange or red.
- */
+/* The supplied Sentinel logo, with shape and color cues for each severity. */
 (function (root) {
   'use strict';
 
-  var FACE = 'M32 5c13.2 0 23 4.3 23 10.8 0 15.8-7.4 36.6-23 43.9C16.4 52.4 9 31.6 9 15.8 9 9.3 18.8 5 32 5Z';
-  var ROUND_EYES = 'M22.2 25.4c-3 0-5.1 2-5.1 4.7s2.1 4.7 5.1 4.7 5.1-2 5.1-4.7-2.1-4.7-5.1-4.7ZM41.8 25.4c-3 0-5.1 2-5.1 4.7s2.1 4.7 5.1 4.7 5.1-2 5.1-4.7-2.1-4.7-5.1-4.7Z';
-  var SMILE = 'M21.6 40.4c2.9 4.4 6.4 6.6 10.4 6.6s7.5-2.2 10.4-6.6c.6-.9 1.9-1.2 2.8-.6.9.6 1.2 1.9.6 2.8-3.7 5.6-8.3 8.4-13.8 8.4s-10.1-2.8-13.8-8.4c-.6-.9-.3-2.2.6-2.8.9-.6 2.2-.3 2.8.6Z';
-  var FLAT = 'M24 41.5h16a2.2 2.2 0 0 1 0 4.4H24a2.2 2.2 0 0 1 0-4.4Z';
-  var ANGRY_EYES = 'M16.5 24.5l12.8 4.6-.6 5.6-11.2-2.2ZM47.5 24.5l-12.8 4.6.6 5.6 11.2-2.2Z';
-  var ZIGZAG = 'M19.5 43.2l6.2-4.6 6.3 4.6 6.3-4.6 6.2 4.6v4.4l-6.2-4.6-6.3 4.6-6.3-4.6-6.2 4.6Z';
-
-  var GLYPHS = {
-    scam: '<path fill="currentColor" fill-rule="evenodd" d="' + FACE + ROUND_EYES + SMILE + '"/>',
-    virus:
-      '<g transform="translate(6.4 7.4) scale(.8)"><path fill="currentColor" fill-rule="evenodd" d="' + FACE + ROUND_EYES + FLAT + '"/></g>' +
-      '<path fill="currentColor" d="M32 1.2a3.4 3.4 0 1 1 0 6.8 3.4 3.4 0 0 1 0-6.8ZM8.2 12.2a3.4 3.4 0 1 1 0 6.8 3.4 3.4 0 0 1 0-6.8ZM55.8 12.2a3.4 3.4 0 1 1 0 6.8 3.4 3.4 0 0 1 0-6.8ZM4.4 33.4a3.4 3.4 0 1 1 0 6.8 3.4 3.4 0 0 1 0-6.8ZM59.6 33.4a3.4 3.4 0 1 1 0 6.8 3.4 3.4 0 0 1 0-6.8ZM14.6 53.6a3.4 3.4 0 1 1 0 6.8 3.4 3.4 0 0 1 0-6.8ZM49.4 53.6a3.4 3.4 0 1 1 0 6.8 3.4 3.4 0 0 1 0-6.8Z"/>',
-    malware:
-      '<path fill="currentColor" d="M14.5 13.5 9.2 1.6l12.4 5.7ZM49.5 13.5l5.3-11.9-12.4 5.7Z"/>' +
-      '<path fill="currentColor" fill-rule="evenodd" d="' + FACE + ANGRY_EYES + ZIGZAG + '"/>'
-  };
-
-  var COLORS = { yellow: '#f5c542', orange: '#f08a24', red: '#e5484d', clear: '#4cb782' };
+  var COLORS = { yellow: '#f5c542', orange: '#f08a24', red: '#e5484d', green: '#4cb782', clear: '#4cb782' };
   var NAMES = { scam: 'Scam', virus: 'Virus', malware: 'Malware' };
+  var MATRICES = {
+    yellow: '.245 .825 .083 0 0 .197 .663 .067 0 0 .066 .222 .022 0 0 0 0 0 1 0',
+    orange: '.240 .808 .082 0 0 .138 .464 .047 0 0 .036 .121 .012 0 0 0 0 0 1 0',
+    red: '.229 .771 .078 0 0 .072 .242 .024 0 0 .077 .259 .026 0 0 0 0 0 1 0',
+    green: '.076 .256 .026 0 0 .183 .616 .062 0 0 .130 .438 .044 0 0 0 0 0 1 0'
+  };
+  // Added as vector details so the original PNG stays intact and is cached once.
+  var DETAILS = {
+    orange: '<path d="M21.8 23.8 17.3 20.4 19.8 29.2 23.1 30.4M41.1 23.8 45.6 20.4 43.1 29.2 39.8 30.4" fill="currentColor"/>' +
+      '<path d="m25.2 28.7 4.5 1.8m9.1-1.8-4.5 1.8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="square"/>',
+    red: '<path d="M24.8 22.9C18.1 22.4 15.4 16.2 16.7 9.9c2.2 4.2 4.5 6.2 10.7 7.1ZM39.2 22.9c6.7-.5 9.4-6.7 8.1-13-2.2 4.2-4.5 6.2-10.7 7.1Z" fill="currentColor"/>'
+  };
+  var sequence = 0;
+  var logo = typeof document !== 'undefined' && document.currentScript
+    ? new URL('../img/sentinel.png', document.currentScript.src).href
+    : 'assets/img/sentinel.png';
 
-  function svg(threat, attrs) {
-    var extra = attrs || '';
-    return '<svg viewBox="0 0 64 64" aria-hidden="true" focusable="false" ' + extra + '>' + (GLYPHS[threat] || GLYPHS.scam) + '</svg>';
+  function svg(threat, attrs, severity) {
+    var tone = severity === 'clear' ? 'green' : severity;
+    var filtered = Object.prototype.hasOwnProperty.call(MATRICES, tone);
+    var id = 'sentinel-mark-' + (++sequence);
+    var defs = filtered ? '<defs><filter id="' + id + '" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="' + MATRICES[tone] + '"/></filter></defs>' : '';
+    var variant = tone === 'red' ? 'horned' : tone === 'orange' ? 'angular' : 'normal';
+    return '<svg viewBox="0 0 64 64" aria-hidden="true" focusable="false" data-icon-variant="' + variant + '" ' + (attrs || '') + '>' + defs +
+      '<image href="' + logo + '" width="64" height="64"' + (filtered ? ' filter="url(#' + id + ')"' : '') + '/>' +
+      '<g style="color:' + (COLORS[tone] || '#d4ae63') + '">' + (DETAILS[tone] || '') + '</g></svg>';
   }
 
-  root.SentinelMasks = { svg: svg, GLYPHS: GLYPHS, COLORS: COLORS, NAMES: NAMES };
+  function paint(scope) {
+    scope.querySelectorAll('[data-glyph]').forEach(function (el) {
+      var card = el.closest('[data-severity]');
+      var tone = card ? card.dataset.severity : ['red', 'orange', 'yellow'].find(function (color) { return el.classList.contains('m--' + color); });
+      el.innerHTML = svg(el.dataset.glyph, '', tone);
+    });
+  }
+
+  root.SentinelMasks = { svg: svg, paint: paint, COLORS: COLORS, NAMES: NAMES };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

@@ -85,7 +85,7 @@
     list.innerHTML = data.recent.map((row) => {
       const tone = tones[row.level] || 'green';
       return `<li>
-        <span class="list__mask" style="color:${COLORS[tone]}">${mask()}</span>
+        <span class="list__mask" style="color:${COLORS[tone]}">${mask('', tone)}</span>
         <span class="list__host">${esc(row.host)}</span>
         <span class="list__time">${when(row.created_at)}</span>
       </li>`;
