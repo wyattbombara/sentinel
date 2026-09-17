@@ -1,23 +1,27 @@
-/* A release link is exposed only when a real archive has been published. */
-(async () => {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 8000);
-  try {
-    const response = await fetch('downloads/latest.json', { signal: controller.signal });
-    if (!response.ok) return;
-    const info = await response.json();
-    if (!info.available || !info.download || !info.version) return;
-    const url = new URL(info.download, location.href);
-    if (url.origin !== location.origin || !url.pathname.endsWith('.zip')) return;
-    const archive = await fetch(url.href, { method: 'HEAD', signal: controller.signal });
-    if (!archive.ok || (archive.headers.get('content-type') || '').includes('text/html')) return;
-    const link = document.getElementById('dl');
-    link.href = url.href;
-    link.download = '';
-    link.removeAttribute('aria-disabled');
-    link.textContent = 'Download browser extension';
-    document.getElementById('meta').textContent = `Version ${info.version}`;
-    document.getElementById('installGuide').hidden = false;
-  } catch { /* Keep the visible coming-soon message when no release is available. */ }
-  finally { clearTimeout(timer); }
+/* Download page: real release details from GitHub, or an honest "not published yet". */
+(() => {
+  'use strict';
+  const button = document.querySelector('[data-installer]');
+  const meta = document.querySelector('[data-installer-meta]');
+  if (!button || !meta) return;
+
+  const esc = (v) => String(v == null ? '' : v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const mb = (n) => `${(n / 1048576).toFixed(0)} MB`;
+
+  fetch(`https://api.github.com/repos/${button.dataset.releases}/releases/latest`, { headers: { Accept: 'application/vnd.github+json' } })
+    .then((r) => (r.ok ? r.json() : null))
+    .then((release) => {
+      const asset = release && (release.assets || []).find((a) => a.name === 'Sentinel-Setup.exe');
+      if (asset) {
+        meta.innerHTML = `<span>Version ${esc(String(release.tag_name).replace(/^v/, ''))}</span><span>${mb(asset.size)}</span><span>Windows 10 &amp; 11, 64-bit</span>`;
+        return;
+      }
+      // No release yet: say so rather than hand out a link that 404s.
+      button.removeAttribute('href');
+      button.classList.add('is-soon');
+      button.setAttribute('aria-disabled', 'true');
+      button.lastChild.textContent = ' Windows build not published yet';
+      meta.innerHTML = '<span>The first release is being prepared</span>';
+    })
+    .catch(() => { /* offline or rate-limited: the link still reaches the latest release */ });
 })();

@@ -2,28 +2,66 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Page not found - Sentinel</title>
-<meta name="robots" content="noindex">
-<link rel="icon" href="assets/img/sentinel.png" type="image/png">
+<script src="assets/js/static.js"></script>
+<script src="assets/js/boot.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0b0d">
+<meta name="color-scheme" content="dark">
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/img/icon-192.png">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="preload" href="assets/fonts/geist-normal-300-700.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="assets/fonts/instrument-serif-normal-400.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="assets/css/sentinel.css">
-<link rel="stylesheet" href="assets/css/pages.css">
+<link rel="stylesheet" href="assets/css/interactive.css">
+<meta property="og:site_name" content="Sentinel">
+<meta property="og:type" content="website">
+<meta property="og:image" content="https://wyattbombara.github.io/sentinel/assets/img/og.png">
+<meta name="twitter:card" content="summary_large_image">
+
+<title>Page not found · Sentinel</title>
+<meta name="robots" content="noindex">
 </head>
-<body>
+<body class="has-prelaunch">
+<header class="nav" data-nav>
+  <div class="wrap nav__inner">
+    <a class="logo" href="index.html" aria-label="Sentinel home">
+      <span class="logo__mark"><svg viewBox="0 0 64 64" aria-hidden="true" focusable="false" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M32 2.6 57.4 10v18.6c0 14.6-9.9 24.6-25.4 31.4C16.5 53.2 6.6 43.2 6.6 28.6V10Zm0 4.2L10.6 13v15.6c0 12.2 8 20.7 21.4 26.8 13.4-6.1 21.4-14.6 21.4-26.8V13Z"/><g transform="translate(32 30.5) scale(.70) translate(-32 -30.5)"><path fill="currentColor" fill-rule="evenodd" d="M32 11.6c-5.6 0-10.4 1.8-12.6 5C18.4 18.1 18 19.9 18 21.8v7.8c0 3.8 1.2 7 3.4 9.8L32 49.4l10.6-10c2.2-2.8 3.4-6 3.4-9.8v-7.8c0-1.9-.4-3.7-1.4-5.2-2.2-3.2-7-5-12.6-5ZM21 23.4l8 3-.5 3.6-7.5-1.8ZM43 23.4l-8 3 .5 3.6 7.5-1.8ZM24.6 32l4.6 1.1v8.4l-3-3.4ZM39.4 32l-4.6 1.1v8.4l3-3.4Z"/><path fill="currentColor" fill-rule="evenodd" d="M42.8 16.2a2.3 2.3 0 1 1 0 4.6 2.3 2.3 0 0 1 0-4.6Z"/></g></svg></span>
+      Sentinel
+    </a>
+    <nav class="nav__links" aria-label="Main">
+      <a href="index.html#masks" data-spy="masks">The masks</a>
+      <a href="index.html#how" data-spy="how">How it works</a>
+      <a href="index.html#game" data-spy="game">Spot the scam</a>
+      <a href="index.html#try" data-spy="try">Try a link</a>
+      <a href="pricing.html" data-spy="pricing">Pricing</a>
+    </nav>
+    <div class="nav__actions" data-auth-actions>
+      <a class="btn btn--ghost btn--sm is-soon" role="link" aria-disabled="true" title="Not available until launch">Sign in</a>
+      <a class="btn btn--gold btn--sm" href="download.html">Download</a>
+    </div>
+    <button class="nav__toggle" type="button" aria-label="Menu" aria-expanded="false" data-nav-toggle>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 8h16M4 16h16"/></svg>
+    </button>
+  </div>
+</header>
 
 <main>
-<section class="hero" style="padding:110px 0;min-height:80vh;display:grid;place-items:center">
-  <div class="wrap narrow center">
-    <img src="assets/img/sentinel.png" width="58" height="58" style="margin-inline:auto;border-radius:12px" alt="">
-    <h1 style="font-size:2.2rem;margin-top:18px">Nothing behind this mask</h1>
-    <p class="lede">That page doesn't exist &mdash; which, for once, is not suspicious.</p>
-    <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:22px">
-      <a class="btn btn--gold" href="index.html">Back to the start</a>
-      <a class="btn btn--ghost" href="app.html">Open Sentinel</a>
+<div class="prelaunch" role="status"><b>Preview.</b> Sentinel hasn&rsquo;t launched yet, so accounts, scanning and downloads aren&rsquo;t available here. Everything else is the real product &mdash; the verdicts on this page come from Sentinel&rsquo;s own engine.</div>
+  <section class="page-head" style="min-height:78vh;display:grid;place-items:center">
+    <div class="wrap-narrow">
+      <div class="mask-card__glyph" style="--c:var(--gold-400);margin:0 auto 20px;color:var(--gold-400)" data-glyph="scam" data-reveal="scale"></div>
+      <span class="kicker" data-reveal>404</span>
+      <h1 data-split>Nothing behind <span class="serif italic">this mask.</span></h1>
+      <p data-reveal>This page doesn’t exist &mdash; which, for once, isn’t suspicious.</p>
+      <div class="hero__cta" data-reveal style="--d:.2s">
+        <a class="btn btn--gold btn--lg" href="index.html">Back home</a>
+        <a class="btn btn--lg is-soon" role="link" aria-disabled="true" title="Not available until launch">Open Sentinel</a>
+      </div>
     </div>
-  </div>
-</section>
+  </section>
 </main>
-
+<script src="assets/js/masks.js"></script>
+<script src="assets/js/site.js"></script>
 </body>
 </html>

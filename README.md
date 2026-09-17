@@ -1,3 +1,9 @@
+<!-- built-from -->
+> **This repository holds build output.** The site is generated from
+> [zzilinct/Sentinel](https://github.com/zzilinct/Sentinel) (`web/`) by
+> `scripts/publish-site.js`. Edit the source there; changes made here are
+> overwritten on the next publish.
+
 # Sentinel website
 
 Static product preview. There is currently no API, account service, payment integration or downloadable extension in this repository.

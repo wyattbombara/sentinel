@@ -1,4 +1,4 @@
-/* Sentinel marketing site: navigation, reveals, the hero scan, counters. */
+/* Sentinel marketing pages: navigation, reveals, counters, plan finder. */
 (() => {
   'use strict';
 
@@ -6,52 +6,91 @@
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
   const Masks = window.SentinelMasks;
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  // Render immediately on browsers without IntersectionObserver.
+
+  // Browsers without IntersectionObserver still get everything, revealed at once.
   const Observer = window.IntersectionObserver || class {
     constructor(callback) { this.callback = callback; }
-    observe(target) { setTimeout(() => this.callback([{ target, isIntersecting: true }]), 0); }
+    observe(target) { setTimeout(() => this.callback([{ target, isIntersecting: true }], this), 0); }
     unobserve() {}
+    disconnect() {}
   };
+
+  window.Site = { $, $$, reduced, Observer };
 
   /* ------------------------------------------------------------- glyphs */
 
-  function paintGlyphs(root = document) {
-    Masks.paint(root);
-  }
-  paintGlyphs();
+  $$('[data-glyph]').forEach((el) => { if (!el.firstElementChild) el.innerHTML = Masks.svg(el.dataset.glyph); });
 
   /* ---------------------------------------------------------------- nav */
 
   const nav = $('[data-nav]');
   if (nav) {
-    const onScroll = () => nav.classList.toggle('is-scrolled', scrollY > 12);
-    addEventListener('scroll', onScroll, { passive: true });
-    onScroll();
     const toggle = $('[data-nav-toggle]');
-    const close = () => {
-      nav.classList.remove('is-open');
-      toggle?.setAttribute('aria-expanded', 'false');
-    };
     toggle && toggle.addEventListener('click', () => {
       const open = nav.classList.toggle('is-open');
       toggle.setAttribute('aria-expanded', String(open));
     });
-    $$('a', nav).forEach((a) => a.addEventListener('click', close));
+    $$('.nav__links a', nav).forEach((a) => a.addEventListener('click', () => {
+      nav.classList.remove('is-open');
+      toggle && toggle.setAttribute('aria-expanded', 'false');
+    }));
     document.addEventListener('keydown', (ev) => {
-      if (ev.key === 'Escape' && nav.classList.contains('is-open')) { close(); toggle?.focus(); }
+      if (ev.key === 'Escape' && nav.classList.contains('is-open')) { nav.classList.remove('is-open'); toggle && toggle.focus(); }
     });
-    document.addEventListener('click', (ev) => { if (!nav.contains(ev.target)) close(); });
+    document.addEventListener('click', (ev) => {
+      if (!nav.contains(ev.target) && nav.classList.contains('is-open')) {
+        nav.classList.remove('is-open');
+        toggle && toggle.setAttribute('aria-expanded', 'false');
+      }
+    });
+  }
+
+  // Back-to-top button, shown once the reader is well down the page.
+  const toTop = document.createElement('button');
+  toTop.className = 'to-top';
+  toTop.type = 'button';
+  toTop.setAttribute('aria-label', 'Back to top');
+  toTop.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5m0 0-6 6m6-6 6 6"/></svg>';
+  toTop.addEventListener('click', () => scrollTo({ top: 0, behavior: reduced ? 'auto' : 'smooth' }));
+  document.body.appendChild(toTop);
+
+  let ticking = false;
+  const onScroll = () => {
+    if (ticking) return;
+    ticking = true;
+    requestAnimationFrame(() => {
+      if (nav) nav.classList.toggle('is-scrolled', scrollY > 12);
+      toTop.classList.toggle('is-on', scrollY > innerHeight * 1.5);
+      ticking = false;
+    });
+  };
+  addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+
+  // Highlight the nav link for the section being read (home page only).
+  const spyLinks = $$('[data-spy]');
+  const spyTargets = spyLinks.map((a) => document.getElementById(a.dataset.spy)).filter(Boolean);
+  if (spyTargets.length) {
+    const spy = new Observer((entries) => {
+      for (const e of entries) {
+        if (!e.isIntersecting) continue;
+        spyLinks.forEach((a) => a.classList.toggle('is-active', a.dataset.spy === e.target.id));
+      }
+    }, { rootMargin: '-45% 0px -50% 0px' });
+    spyTargets.forEach((t) => spy.observe(t));
+  } else if (location.pathname === '/pricing') {
+    spyLinks.forEach((a) => a.classList.toggle('is-active', a.dataset.spy === 'pricing'));
   }
 
   $$('[data-year]').forEach((el) => { el.textContent = new Date().getFullYear(); });
 
-  // Signed-in visitors get a direct way back into the app.
-  if (window.SENTINEL_API_ENABLED) fetch('/api/v1/auth/me', { credentials: 'same-origin' })
+  // Signed-in visitors get a direct way back into the app. A static export has
+  // no API to ask, so the signed-out header stands.
+  if (!window.SENTINEL_STATIC) fetch('/api/v1/auth/me', { credentials: 'same-origin' })
     .then((r) => (r.ok ? r.json() : null))
     .then((me) => {
       const slot = $('[data-auth-actions]');
-      if (!me?.user || !slot) return;
-      slot.innerHTML = '<a class="btn btn--gold btn--sm" href="app.html">Open Sentinel</a>';
+      if (me && slot) slot.innerHTML = '<a class="btn btn--gold btn--sm" href="/app">Open Sentinel</a>';
     })
     .catch(() => {});
 
@@ -74,8 +113,7 @@
           }
           child.replaceWith(frag);
         } else if (child.nodeType === 1 && child.classList.contains('gold-text')) {
-          // Gradient text can't be split into separate boxes without losing the
-          // gradient, so it animates in as one unit.
+          // Gradient text can't be split without losing the gradient, so it animates as one unit.
           child.classList.add('word');
           child.style.setProperty('--d', `${0.05 + i++ * 0.055}s`);
         } else if (child.nodeType === 1 && child.tagName !== 'BR') {
@@ -104,11 +142,9 @@
     if (reduced) { el.textContent = target.toLocaleString(); return; }
     el.textContent = '0';
     const start = performance.now();
-    const dur = 1600;
     const tick = (now) => {
-      const t = Math.min(1, (now - start) / dur);
-      const eased = 1 - Math.pow(1 - t, 4);
-      el.textContent = Math.round(target * eased).toLocaleString();
+      const t = Math.min(1, (now - start) / 1600);
+      el.textContent = Math.round(target * (1 - Math.pow(1 - t, 4))).toLocaleString();
       if (t < 1) requestAnimationFrame(tick);
     };
     requestAnimationFrame(tick);
@@ -116,7 +152,9 @@
 
   const counters = $$('[data-count]');
   if (counters.length) {
-    const live = window.SENTINEL_API_ENABLED ? fetch('/api/v1/threat-stats').then((r) => (r.ok ? r.json() : null)).catch(() => null) : Promise.resolve(null);
+    const live = window.SENTINEL_STATIC
+      ? Promise.resolve(window.SENTINEL_DEMO && window.SENTINEL_DEMO.stats)
+      : fetch('/api/v1/threat-stats').then((r) => (r.ok ? r.json() : null)).catch(() => null);
     const cio = new Observer(async (entries) => {
       const stats = await live;
       for (const e of entries) {
@@ -131,126 +169,78 @@
     counters.forEach((c) => cio.observe(c));
   }
 
-  /* ---------------------------------------------------------- hero scan */
+  /* -------------------------------------------------------- plan finder */
 
-  const stage = $('[data-stage]');
-  if (stage) {
-    const rows = $$('.res', stage);
-    const scan = $('[data-scanline]', stage);
-    const floats = $$('[data-float]', stage);
-    const serp = $('[data-serp]', stage);
+  const finder = $('[data-finder]');
+  if (finder) {
+    const pricing = $('[data-pricing]');
+    const state = { live: true, hours: 20, email: false };
+    const hours = $('[data-f-hours]', finder);
+    const hoursOut = $('[data-f-hours-out]', finder);
+    const hoursRow = $('[data-f-hours-row]', finder);
+    const answer = $('[data-f-answer]', finder);
 
-    const build = (row) => {
-      const slot = $('.masks', row);
-      slot.innerHTML = '';
-      const spec = row.dataset.masks;
-      if (!spec) return [];
-      return spec.split(',').map((pair) => {
-        const [threat, color] = pair.split(':');
-        const m = document.createElement('span');
-        m.className = `m m--${color}`;
-        m.innerHTML = Masks.svg(threat, '', color);
-        slot.appendChild(m);
-        return m;
+    const radio = (attr, key, parse) => {
+      const buttons = $$(`[${attr}]`, finder);
+      const choose = (b) => {
+        buttons.forEach((x) => x.setAttribute('aria-checked', String(x === b)));
+        state[key] = parse(b.getAttribute(attr));
+        update();
+      };
+      buttons.forEach((b, i) => {
+        b.addEventListener('click', () => choose(b));
+        b.addEventListener('keydown', (ev) => {
+          if (!['ArrowLeft', 'ArrowRight'].includes(ev.key)) return;
+          ev.preventDefault();
+          const next = buttons[(i + (ev.key === 'ArrowRight' ? 1 : buttons.length - 1)) % buttons.length];
+          next.focus();
+          choose(next);
+        });
       });
     };
+    radio('data-f-live', 'live', (v) => v === 'yes');
+    radio('data-f-email', 'email', (v) => v === 'yes');
+    hours.addEventListener('input', () => { state.hours = Number(hours.value); update(); });
 
-    const run = () => {
-      floats.forEach((f) => f.classList.remove('is-on'));
-      $$('.bar__fill', stage).forEach((b) => { b.style.width = '0'; });
-      rows.forEach((r) => r.classList.remove('is-danger'));
-      const built = rows.map(build);
-      serp.style.setProperty('--scan-end', `${serp.offsetHeight + 20}px`);
-      scan.classList.remove('is-running');
-      void scan.offsetWidth;
+    function update() {
+      hoursOut.textContent = `${state.hours} h`;
+      hours.style.setProperty('--p', `${(state.hours / Number(hours.max || 100)) * 100}%`);
+      hours.disabled = !state.live;
+      hoursRow.classList.toggle('is-muted', !state.live);
 
-      if (reduced) {
-        built.flat().forEach((m) => m.classList.add('is-on'));
-        floats.forEach((f) => f.classList.add('is-on'));
-        $$('.bar__fill', stage).forEach((b) => { b.style.width = `${b.dataset.w}%`; });
-        return;
+      let pick;
+      let why;
+      if (!state.live && !state.email) {
+        pick = 'free';
+        why = '10 link scans and 5 virus &amp; malware scans a week cover the odd link you&rsquo;re unsure about.';
+      } else if (state.hours > 96) {
+        pick = 'ultimate';
+        why = `at around ${state.hours} hours a week you&rsquo;d run past Max&rsquo;s 96, and Ultimate lifts the weekly cap entirely.`;
+      } else if (state.email || state.hours > 24) {
+        pick = 'max';
+        why = state.email
+          ? 'pasting emails in for a full scan is part of Max, and it researches every live result too.'
+          : `at around ${state.hours} hours a week you&rsquo;d outgrow Pro&rsquo;s 24; Max gives you 96, with research on every result.`;
+      } else {
+        pick = 'pro';
+        why = `its 24 live hours a week cover your ${state.hours}, and minutes only count while Sentinel is actually checking something.`;
       }
+      answer.innerHTML = `<b>${{ free: 'Free', pro: 'Pro', max: 'Max', ultimate: 'Ultimate' }[pick]}</b> fits best &mdash; ${why}`;
 
-      scan.classList.add('is-running');
-      rows.forEach((row, i) => {
-        const at = 280 + (row.offsetTop / serp.offsetHeight) * 2300;
-        setTimeout(() => {
-          built[i].forEach((m, k) => setTimeout(() => m.classList.add('is-on'), k * 110));
-          if ('danger' in row.dataset) row.classList.add('is-danger');
-        }, at);
+      $$('[data-plan-card]', pricing).forEach((card) => {
+        const on = card.dataset.planCard === pick;
+        card.classList.toggle('is-recommended', on);
+        const badge = $('.plan__pick', card);
+        if (on && !badge) card.insertAdjacentHTML('afterbegin', '<span class="plan__pick">Best for you</span>');
+        if (!on && badge) badge.remove();
       });
-      setTimeout(() => {
-        floats[0] && floats[0].classList.add('is-on');
-        $$('.bar__fill', stage).forEach((b, i) => setTimeout(() => { b.style.width = `${b.dataset.w}%`; }, 250 + i * 120));
-      }, 2700);
-      setTimeout(() => floats[1] && floats[1].classList.add('is-on'), 3300);
-    };
-
-    let timer = null;
-    const sio = new Observer((entries) => {
-      const visible = entries[0].isIntersecting;
-      if (visible) {
-        stage.classList.add('is-in');
-        if (!timer) { run(); if (!reduced) timer = setInterval(run, 9000); }
-      } else if (timer) {
-        clearInterval(timer);
-        timer = null;
-      }
-    }, { threshold: 0.25 });
-    sio.observe(stage);
-  }
-
-  /* ------------------------------------------------------ mask severity */
-
-  for (const card of $$('[data-trio]')) {
-    const colors = { yellow: 'var(--yellow)', orange: 'var(--orange)', red: 'var(--red)' };
-    const buttons = $$('[data-sev]', card);
-    const cycle = document.createElement('button');
-    cycle.type = 'button';
-    cycle.className = 'severity-cycle';
-    cycle.dataset.cycle = '';
-    cycle.textContent = 'Cycle stages';
-    const name = $('h3', card).textContent;
-    cycle.setAttribute('aria-label', `Cycle ${name} stages`);
-    card.append(cycle);
-    let timer = null;
-
-    const select = (b) => {
-      buttons.forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
-      card.style.setProperty('--c', colors[b.dataset.sev]);
-      card.dataset.severity = b.dataset.sev;
-      paintGlyphs(card);
-    };
-    const pause = () => {
-      clearInterval(timer);
-      timer = null;
-      card.dataset.cycling = 'false';
-      cycle.textContent = 'Resume cycle';
-      cycle.setAttribute('aria-label', `Resume ${name} cycle`);
-    };
-    const start = () => {
-      clearInterval(timer);
-      card.dataset.cycling = 'true';
-      cycle.textContent = 'Pause cycle';
-      cycle.setAttribute('aria-label', `Pause ${name} cycle`);
-      timer = setInterval(() => {
-        const current = buttons.findIndex((b) => b.dataset.sev === card.dataset.severity);
-        select(buttons[(current + 1) % buttons.length]);
-      }, 2500);
-    };
-    buttons.forEach((b) => b.addEventListener('click', () => {
-      select(b);
-      start();
-    }));
-    cycle.addEventListener('click', () => { if (timer !== null) pause(); else start(); });
-    document.addEventListener('visibilitychange', () => { if (document.hidden && timer !== null) pause(); });
-    addEventListener('pagehide', () => { if (timer !== null) pause(); });
+      pricing.classList.add('has-pick');
+    }
+    update();
   }
 
   /* ---------------------------------------------------- download picker */
 
   const os = /Mac/i.test(navigator.platform) ? 'mac' : /Linux/i.test(navigator.platform) && !/Android/i.test(navigator.userAgent) ? 'linux' : 'windows';
   $$('[data-os-label]').forEach((el) => { el.textContent = { windows: 'Windows', mac: 'macOS', linux: 'Linux' }[os]; });
-  $$('[data-os]').forEach((el) => { if (el.dataset.os === os) el.classList.add('is-current'); });
-  clearTimeout(window.sentinelRevealFallback);
 })();

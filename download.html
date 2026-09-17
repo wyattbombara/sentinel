@@ -2,141 +2,188 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Download Sentinel</title>
-<meta name="description" content="Download the Sentinel extension for Chrome, Edge, Brave and Opera, and switch on real-time scam checking.">
-<link rel="icon" href="assets/img/sentinel.png" type="image/png">
+<script src="assets/js/static.js"></script>
+<script src="assets/js/boot.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0b0d">
+<meta name="color-scheme" content="dark">
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/img/icon-192.png">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="preload" href="assets/fonts/geist-normal-300-700.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="assets/fonts/instrument-serif-normal-400.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="assets/css/sentinel.css">
-<link rel="stylesheet" href="assets/css/pages.css">
-</head>
-<body>
+<link rel="stylesheet" href="assets/css/interactive.css">
+<meta property="og:site_name" content="Sentinel">
+<meta property="og:type" content="website">
+<meta property="og:image" content="https://wyattbombara.github.io/sentinel/assets/img/og.png">
+<meta name="twitter:card" content="summary_large_image">
 
-<header class="site-header">
-  <div class="wrap site-header__inner">
-    <a class="brand" href="index.html">
-      <img class="logo-image" src="assets/img/sentinel.png" width="40" height="40" alt="">
-      <span class="brand__name">Sentinel</span>
+<title>Download Sentinel</title>
+<meta name="description" content="Download the Sentinel app for live scam, virus and malware protection on search results, email and downloads.">
+<meta property="og:title" content="Download Sentinel">
+<meta property="og:url" content="https://wyattbombara.github.io/sentinel/download">
+</head>
+<body class="has-prelaunch">
+<header class="nav" data-nav>
+  <div class="wrap nav__inner">
+    <a class="logo" href="index.html" aria-label="Sentinel home">
+      <span class="logo__mark"><svg viewBox="0 0 64 64" aria-hidden="true" focusable="false" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M32 2.6 57.4 10v18.6c0 14.6-9.9 24.6-25.4 31.4C16.5 53.2 6.6 43.2 6.6 28.6V10Zm0 4.2L10.6 13v15.6c0 12.2 8 20.7 21.4 26.8 13.4-6.1 21.4-14.6 21.4-26.8V13Z"/><g transform="translate(32 30.5) scale(.70) translate(-32 -30.5)"><path fill="currentColor" fill-rule="evenodd" d="M32 11.6c-5.6 0-10.4 1.8-12.6 5C18.4 18.1 18 19.9 18 21.8v7.8c0 3.8 1.2 7 3.4 9.8L32 49.4l10.6-10c2.2-2.8 3.4-6 3.4-9.8v-7.8c0-1.9-.4-3.7-1.4-5.2-2.2-3.2-7-5-12.6-5ZM21 23.4l8 3-.5 3.6-7.5-1.8ZM43 23.4l-8 3 .5 3.6 7.5-1.8ZM24.6 32l4.6 1.1v8.4l-3-3.4ZM39.4 32l-4.6 1.1v8.4l3-3.4Z"/><path fill="currentColor" fill-rule="evenodd" d="M42.8 16.2a2.3 2.3 0 1 1 0 4.6 2.3 2.3 0 0 1 0-4.6Z"/></g></svg></span>
+      Sentinel
     </a>
-    <nav class="page-nav" aria-label="Main">
-      <a href="index.html#how">How it works</a>
-      <a href="index.html#masks">The masks</a>
-      <a href="download.html">Download</a>
+    <nav class="nav__links" aria-label="Main">
+      <a href="index.html#masks" data-spy="masks">The masks</a>
+      <a href="index.html#how" data-spy="how">How it works</a>
+      <a href="index.html#game" data-spy="game">Spot the scam</a>
+      <a href="index.html#try" data-spy="try">Try a link</a>
+      <a href="pricing.html" data-spy="pricing">Pricing</a>
     </nav>
-    <div class="header-actions" data-auth-slot><a class="btn btn--sm" href="app.html">Preview dashboard</a></div>
+    <div class="nav__actions" data-auth-actions>
+      <a class="btn btn--ghost btn--sm is-soon" role="link" aria-disabled="true" title="Not available until launch">Sign in</a>
+      <a class="btn btn--gold btn--sm" href="download.html">Download</a>
+    </div>
+    <button class="nav__toggle" type="button" aria-label="Menu" aria-expanded="false" data-nav-toggle>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 8h16M4 16h16"/></svg>
+    </button>
   </div>
 </header>
 
 <main>
-<section class="hero" style="padding-bottom:40px">
-  <div class="wrap narrow center">
-    <span class="eyebrow">Download</span>
-    <h1 style="font-size:clamp(2rem,4.4vw,2.9rem)">Put Sentinel in your browser</h1>
-    <p class="lede">The Sentinel browser extension is in development for Chrome, Edge, Brave and other Chromium browsers.</p>
-    <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:26px">
-      <a class="btn btn--lg btn--gold" aria-disabled="true" role="link" id="dl">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-          <path d="M12 3v12m0 0 4.5-4.5M12 15l-4.5-4.5M4 19h16"/>
-        </svg>
-        Download coming soon
-      </a>
-      <a class="btn btn--lg btn--ghost" href="app.html">Preview the dashboard</a>
-    </div>
-    <p class="hero__note" id="meta" role="status">There is no downloadable build yet. Check back for the first release.</p>
-  </div>
-</section>
-
-<section class="tight" id="installGuide" hidden style="padding-top:20px">
-  <div class="wrap narrow">
-    <div class="card">
-      <span class="eyebrow">Installation</span>
-      <h2 style="font-size:1.5rem">Four steps, about two minutes</h2>
-      <p class="muted small" style="margin-bottom:22px">
-        These steps are for a downloadable development build. Install the extension
-        from the folder you unzip and keep that folder on your computer.
-      </p>
-
-      <div class="steps">
-        <div class="step">
-          <div>
-            <h3>Unzip the download</h3>
-            <p>Extract the downloaded ZIP to a folder you will keep, such as Documents. The extension needs that folder to keep working.</p>
-          </div>
-        </div>
-        <div class="step">
-          <div>
-            <h3>Open your extensions page</h3>
-            <p>Paste <code>chrome://extensions</code> into the address bar (Edge: <code>edge://extensions</code>, Brave: <code>brave://extensions</code>) and press Enter.</p>
-          </div>
-        </div>
-        <div class="step">
-          <div>
-            <h3>Turn on Developer mode</h3>
-            <p>Toggle <b>Developer mode</b> in the top-right corner, then click <b>Load unpacked</b> and choose the folder you just unzipped.</p>
-          </div>
-        </div>
-        <div class="step">
-          <div>
-            <h3>Sign in once</h3>
-            <p>Click the Sentinel mask in your toolbar and sign in. From then on it runs in the background whenever your browser is open.</p>
-          </div>
-        </div>
+<div class="prelaunch" role="status"><b>Preview.</b> Sentinel hasn&rsquo;t launched yet, so accounts, scanning and downloads aren&rsquo;t available here. Everything else is the real product &mdash; the verdicts on this page come from Sentinel&rsquo;s own engine.</div>
+  <section class="page-head">
+    <div class="wrap">
+      <span class="kicker" data-reveal>Download</span>
+      <h1 data-split>Sentinel for <span class="serif italic gold-text" data-os-label>your computer</span></h1>
+      <p data-reveal>The web app scans links and files anywhere. The Sentinel app unlocks everything that runs live&nbsp;&mdash; on your searches, your inbox and your downloads.</p>
+      <div class="hero__cta" data-reveal style="--d:.2s">
+        <a class="btn btn--gold btn--lg" href="https://github.com/zzilinct/Sentinel/releases/latest/download/Sentinel-Setup.exe" data-installer data-releases="zzilinct/Sentinel">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11m0 0 4.5-4.5M12 15l-4.5-4.5M5 20h14"/></svg>
+          Download for Windows
+        </a>
+        <a class="btn btn--lg is-soon" role="link" aria-disabled="true" title="Not available until launch">Use in your browser <span class="arrow">&rarr;</span></a>
       </div>
+      <p class="hero__fine" data-reveal style="--d:.3s" data-installer-meta><span>Windows 10 &amp; 11</span><span>64-bit</span><span>Free plan included</span></p>
+    </div>
+  </section>
 
-      <div style="margin-top:26px;display:flex;gap:12px;flex-wrap:wrap">
-        <a class="btn btn--gold" href="signup.html">Create free account</a>
-        <a class="btn btn--ghost" href="app.html">Open dashboard</a>
+  <section class="section--tight">
+    <div class="wrap">
+      <div class="section__head section__head--center" style="margin-bottom:48px">
+        <span class="kicker" data-reveal>What the app unlocks</span>
+        <h2 data-split>Browser vs. <span class="serif italic">the app</span></h2>
+      </div>
+      <div class="compare-wrap" data-reveal>
+        <table class="compare">
+          <thead><tr><th></th><th>In your browser</th><th>Sentinel app</th></tr></thead>
+          <tbody>
+            <tr><td>Scan a link you paste in</td><td class="yes">&check;</td><td class="yes">&check;</td></tr>
+            <tr><td>Scan a file for viruses &amp; malware</td><td class="yes">&check;</td><td class="yes">&check;</td></tr>
+            <tr><td>Scan a pasted email (Max)</td><td class="yes">&check;</td><td class="yes">&check;</td></tr>
+            <tr><td>History, plan, two-factor security</td><td class="yes">&check;</td><td class="yes">&check;</td></tr>
+            <tr><td>Masks on every search result (Pro &amp; up)</td><td class="no">&mdash;</td><td class="yes">&check;</td></tr>
+            <tr><td>Masks in Gmail &amp; Outlook (Pro &amp; up)</td><td class="no">&mdash;</td><td class="yes">&check;</td></tr>
+            <tr><td>Warnings before a dangerous page loads (Pro &amp; up)</td><td class="no">&mdash;</td><td class="yes">&check;</td></tr>
+            <tr><td>Download protection (Pro &amp; up)</td><td class="no">&mdash;</td><td class="yes">&check;</td></tr>
+            <tr><td>Runs quietly from the system tray</td><td class="no">&mdash;</td><td class="yes">&check;</td></tr>
+          </tbody>
+        </table>
       </div>
     </div>
+  </section>
 
-    <div class="card" style="margin-top:22px">
-      <h2 style="font-size:1.2rem">Pin it where you can see it</h2>
-      <p class="muted small" style="margin:0">
-        Click the puzzle-piece icon in your toolbar and pin Sentinel. The mask shows
-        the rating for whatever page you are on, and turns
-        <span class="mask-badge mask-badge--yellow"><span data-glyph="scam" data-severity="yellow"></span>yellow</span>,
-        <span class="mask-badge mask-badge--orange"><span data-glyph="scam" data-severity="orange"></span>orange</span> or
-        <span class="mask-badge mask-badge--red"><span data-glyph="scam" data-severity="red"></span>red</span>
-        as the risk rises.
-      </p>
+  <section class="section--tight">
+    <div class="wrap">
+      <div class="section__head">
+        <span class="kicker" data-reveal>Setup</span>
+        <h2 data-split>Protected in <span class="serif italic">minutes</span></h2>
+      </div>
+      <div class="pipeline is-in">
+        <div class="step" data-reveal>
+          <div class="step__num">01</div>
+          <h3>Install Sentinel</h3>
+          <p>Run the installer. Sentinel opens and adds its mask to your system tray.</p>
+        </div>
+        <div class="step" data-reveal style="--d:.08s">
+          <div class="step__num">02</div>
+          <h3>Sign in</h3>
+          <p>Use your email or Google. Download protection switches on automatically on Pro, Max and Ultimate.</p>
+        </div>
+        <div class="step" data-reveal style="--d:.16s">
+          <div class="step__num">03</div>
+          <h3>Add the browser companion</h3>
+          <p>From <b>Live protection</b> in the app, add the companion to Chrome, Edge or Brave so masks appear on results and in your inbox.</p>
+        </div>
+        <div class="step" data-reveal style="--d:.24s">
+          <div class="step__num">04</div>
+          <h3>Browse normally</h3>
+          <p>That&rsquo;s it. Sentinel checks everything in the background while your browser is open.</p>
+        </div>
+      </div>
     </div>
+  </section>
 
-    <div class="card" style="margin-top:22px">
-      <h2 style="font-size:1.2rem">Running your own instance?</h2>
-      <p class="muted small">
-        If you host Sentinel yourself, open the extension's options page and point the
-        <b>Sentinel server</b> field at your own origin. To let a locally loaded build
-        pair with this site, run this in the browser console on this page, using the ID
-        from your extensions page:
-      </p>
-      <p><code>localStorage.setItem('sentinel.extensionId', 'your-extension-id')</code></p>
+  <section class="section--tight">
+    <div class="wrap grid-2col">
+      <div class="tile" data-reveal>
+        <div class="tile__label">macOS &amp; Linux</div>
+        <h3>Coming to the Mac and Linux</h3>
+        <p>Native builds are on the way. Until then, the web app has every manual scan, and you can install it like an app from your browser&rsquo;s address bar.</p>
+        <div style="margin-top:22px"><a class="btn is-soon" role="link" aria-disabled="true" title="Not available until launch">Open the web app</a></div>
+      </div>
+      <div class="tile" data-reveal style="--d:.08s">
+        <div class="tile__label">Browser companion only</div>
+        <h3>Already have the app elsewhere?</h3>
+        <p>The companion is included with the app. If you manage extensions yourself, you can download it separately.</p>
+        <div style="margin-top:22px"><a class="btn" href="https://github.com/zzilinct/Sentinel/releases/latest/download/sentinel-companion.zip">Download companion (.zip)</a></div>
+      </div>
     </div>
-  </div>
-</section>
+  </section>
 </main>
-
-<footer class="site-footer">
-  <div class="wrap site-footer__grid">
-    <div>
-      <a class="brand" href="index.html">
-        <img class="logo-image" src="assets/img/sentinel.png" width="40" height="40" alt="">
-        <span class="brand__name">Sentinel</span>
-      </a>
+<footer class="footer">
+  <div class="wrap">
+    <div class="footer__grid">
+      <div class="footer__brand">
+        <a class="logo" href="index.html">
+          <span class="logo__mark"><svg viewBox="0 0 64 64" aria-hidden="true" focusable="false" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M32 2.6 57.4 10v18.6c0 14.6-9.9 24.6-25.4 31.4C16.5 53.2 6.6 43.2 6.6 28.6V10Zm0 4.2L10.6 13v15.6c0 12.2 8 20.7 21.4 26.8 13.4-6.1 21.4-14.6 21.4-26.8V13Z"/><g transform="translate(32 30.5) scale(.70) translate(-32 -30.5)"><path fill="currentColor" fill-rule="evenodd" d="M32 11.6c-5.6 0-10.4 1.8-12.6 5C18.4 18.1 18 19.9 18 21.8v7.8c0 3.8 1.2 7 3.4 9.8L32 49.4l10.6-10c2.2-2.8 3.4-6 3.4-9.8v-7.8c0-1.9-.4-3.7-1.4-5.2-2.2-3.2-7-5-12.6-5ZM21 23.4l8 3-.5 3.6-7.5-1.8ZM43 23.4l-8 3 .5 3.6 7.5-1.8ZM24.6 32l4.6 1.1v8.4l-3-3.4ZM39.4 32l-4.6 1.1v8.4l3-3.4Z"/><path fill="currentColor" fill-rule="evenodd" d="M42.8 16.2a2.3 2.3 0 1 1 0 4.6 2.3 2.3 0 0 1 0-4.6Z"/></g></svg></span>
+          Sentinel
+        </a>
+        <p>Scam, virus and malware protection that shows you the danger before you click.</p>
+      </div>
+      <div>
+        <h5>Product</h5>
+        <ul>
+          <li><a href="download.html">Download</a></li>
+          <li><a  role="link" aria-disabled="true" title="Not available until launch">Web app</a></li>
+          <li><a href="pricing.html">Pricing</a></li>
+          <li><a href="index.html#how">How it works</a></li>
+        </ul>
+      </div>
+      <div>
+        <h5>Account</h5>
+        <ul>
+          <li><a  role="link" aria-disabled="true" title="Not available until launch">Create account</a></li>
+          <li><a  role="link" aria-disabled="true" title="Not available until launch">Sign in</a></li>
+          <li><a  role="link" aria-disabled="true" title="Not available until launch">Security settings</a></li>
+        </ul>
+      </div>
+      <div>
+        <h5>Company</h5>
+        <ul>
+          <li><a href="privacy.html">Privacy</a></li>
+          <li><a href="terms.html">Terms</a></li>
+          <li><a href="mailto:support@usesentinel.technology">Support</a></li>
+        </ul>
+      </div>
     </div>
-    <nav>
-      <a href="download.html">Download</a>
-      <a href="login.html">Sign in</a>
-      <a href="privacy.html">Privacy</a>
-      <a href="terms.html">Terms</a>
-    </nav>
+    <div class="footer__base">
+      <span>&copy; <span data-year>2026</span> Sentinel. All rights reserved.</span>
+      <span class="mono">www.usesentinel.technology</span>
+    </div>
   </div>
 </footer>
 
-<script src="assets/js/config.js"></script>
 <script src="assets/js/masks.js"></script>
-<script src="assets/js/sentinel.js"></script>
-<script>
-  Sentinel.paintHeader();
-</script>
+<script src="assets/js/site.js"></script>
 <script src="assets/js/download.js"></script>
 </body>
 </html>

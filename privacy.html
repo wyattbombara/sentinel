@@ -2,112 +2,138 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Privacy - Sentinel</title>
-<meta name="description" content="What Sentinel sends to its servers, what it never sends, and how the AI workspace handles your provider keys.">
-<link rel="icon" href="assets/img/sentinel.png" type="image/png">
+<script src="assets/js/static.js"></script>
+<script src="assets/js/boot.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0b0d">
+<meta name="color-scheme" content="dark">
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/img/icon-192.png">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="preload" href="assets/fonts/geist-normal-300-700.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="assets/fonts/instrument-serif-normal-400.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="assets/css/sentinel.css">
-<link rel="stylesheet" href="assets/css/pages.css">
-</head>
-<body>
+<link rel="stylesheet" href="assets/css/interactive.css">
+<meta property="og:site_name" content="Sentinel">
+<meta property="og:type" content="website">
+<meta property="og:image" content="https://wyattbombara.github.io/sentinel/assets/img/og.png">
+<meta name="twitter:card" content="summary_large_image">
 
-<header class="site-header">
-  <div class="wrap site-header__inner">
-    <a class="brand" href="index.html">
-      <img class="logo-image" src="assets/img/sentinel.png" width="40" height="40" alt="">
-      <span class="brand__name">Sentinel</span>
+<title>Privacy · Sentinel</title>
+<meta name="description" content="What Sentinel collects, what it never collects, and how your data is protected.">
+</head>
+<body class="has-prelaunch">
+<header class="nav" data-nav>
+  <div class="wrap nav__inner">
+    <a class="logo" href="index.html" aria-label="Sentinel home">
+      <span class="logo__mark"><svg viewBox="0 0 64 64" aria-hidden="true" focusable="false" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M32 2.6 57.4 10v18.6c0 14.6-9.9 24.6-25.4 31.4C16.5 53.2 6.6 43.2 6.6 28.6V10Zm0 4.2L10.6 13v15.6c0 12.2 8 20.7 21.4 26.8 13.4-6.1 21.4-14.6 21.4-26.8V13Z"/><g transform="translate(32 30.5) scale(.70) translate(-32 -30.5)"><path fill="currentColor" fill-rule="evenodd" d="M32 11.6c-5.6 0-10.4 1.8-12.6 5C18.4 18.1 18 19.9 18 21.8v7.8c0 3.8 1.2 7 3.4 9.8L32 49.4l10.6-10c2.2-2.8 3.4-6 3.4-9.8v-7.8c0-1.9-.4-3.7-1.4-5.2-2.2-3.2-7-5-12.6-5ZM21 23.4l8 3-.5 3.6-7.5-1.8ZM43 23.4l-8 3 .5 3.6 7.5-1.8ZM24.6 32l4.6 1.1v8.4l-3-3.4ZM39.4 32l-4.6 1.1v8.4l3-3.4Z"/><path fill="currentColor" fill-rule="evenodd" d="M42.8 16.2a2.3 2.3 0 1 1 0 4.6 2.3 2.3 0 0 1 0-4.6Z"/></g></svg></span>
+      Sentinel
     </a>
-    <nav class="page-nav" aria-label="Main">
-      <a href="index.html#how">How it works</a>
-      <a href="index.html#masks">The masks</a>
-      <a href="download.html">Download</a>
+    <nav class="nav__links" aria-label="Main">
+      <a href="index.html#masks" data-spy="masks">The masks</a>
+      <a href="index.html#how" data-spy="how">How it works</a>
+      <a href="index.html#game" data-spy="game">Spot the scam</a>
+      <a href="index.html#try" data-spy="try">Try a link</a>
+      <a href="pricing.html" data-spy="pricing">Pricing</a>
     </nav>
-    <div class="header-actions" data-auth-slot><a class="btn btn--sm" href="app.html">Preview dashboard</a></div>
+    <div class="nav__actions" data-auth-actions>
+      <a class="btn btn--ghost btn--sm is-soon" role="link" aria-disabled="true" title="Not available until launch">Sign in</a>
+      <a class="btn btn--gold btn--sm" href="download.html">Download</a>
+    </div>
+    <button class="nav__toggle" type="button" aria-label="Menu" aria-expanded="false" data-nav-toggle>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 8h16M4 16h16"/></svg>
+    </button>
   </div>
 </header>
 
 <main>
-<section class="tight">
-  <div class="wrap narrow">
-    <span class="eyebrow">Privacy</span>
-    <h1 style="font-size:2rem">What Sentinel sees, and what it doesn't</h1>
-    <p class="lede">Plain English first, because the short version is the real version.</p>
+<div class="prelaunch" role="status"><b>Preview.</b> Sentinel hasn&rsquo;t launched yet, so accounts, scanning and downloads aren&rsquo;t available here. Everything else is the real product &mdash; the verdicts on this page come from Sentinel&rsquo;s own engine.</div>
+  <section class="page-head" style="padding-bottom:40px">
+    <div class="wrap-narrow">
+      <span class="kicker" data-reveal>Privacy</span>
+      <h1 data-split>Addresses, <span class="serif italic">not your life.</span></h1>
+      <p data-reveal>A protection product should collect as little as possible. Here is exactly what Sentinel sees.</p>
+      <p class="updated" data-reveal>Last updated 16 September 2026 &middot; beta</p>
+    </div>
+  </section>
 
-    <div class="card" style="margin:26px 0">
-      <h2 style="font-size:1.15rem">What Sentinel sends to its servers</h2>
-      <ul class="reasons" style="margin-bottom:22px">
-        <li>The web addresses of search results on a results page, so they can be scored.</li>
-        <li>The address of a page you navigate to, so it can be checked before it loads.</li>
-        <li>Your account email, your name, and a hash of your password.</li>
-        <li>Sites you report, and sites you mark as trusted.</li>
+  <section class="prose-wrap">
+    <div class="wrap-narrow prose" data-reveal>
+      <h2>What Sentinel processes</h2>
+      <ul>
+        <li><strong>Web addresses</strong> of search results, pages you open and links you scan, so they can be checked.</li>
+        <li><strong>Page contents</strong> of a site, fetched by our servers only when a scan includes research (Pro, Max and Ultimate). Nothing from your own browser session is sent &mdash; no cookies, no logged-in pages.</li>
+        <li><strong>Email details your mail client already shows</strong> &mdash; sender, reply-to, subject, a text excerpt, link addresses and attachment names &mdash; when email protection or a paste-in email scan is used. They are analysed in memory and not stored.</li>
+        <li><strong>Files you upload</strong> to the virus &amp; malware scanner, inspected in memory and discarded. Only the SHA-256 fingerprint may be kept.</li>
+        <li><strong>Downloads on your computer</strong> are inspected locally by the Sentinel app. Only the fingerprint is sent to check against known threats.</li>
+        <li><strong>Your account</strong>: email, name, a scrypt password hash, plan, weekly usage counters, scan history (90 days), trusted sites, reports, and a security log of sign-ins (180 days).</li>
       </ul>
 
-      <h2 style="font-size:1.15rem">What it never sends</h2>
-      <ul class="reasons">
-        <li>The contents of any page. Sentinel reads addresses, not pages.</li>
-        <li>Anything you type: no form fields, no passwords, no messages.</li>
-        <li>Pages behind a login, beyond their address.</li>
-        <li>Your history as a marketing profile. Scan results are cached by domain, not by person.</li>
+      <h2>What Sentinel never does</h2>
+      <ul>
+        <li>Record what you type into websites, or read pages behind your logins.</li>
+        <li>Sell or share personal data for advertising.</li>
+        <li>Ask for passwords to other services. The optional AI assistants use API keys you create, stored with AES-256-GCM encryption.</li>
       </ul>
-    </div>
 
-    <div class="card">
-      <h2 style="font-size:1.15rem">The AI workspace</h2>
-      <p class="muted small" style="margin:0">
-        Sentinel never asks for your ChatGPT, Claude, Gemini or DeepSeek password. Each tab
-        connects through that provider's official API using a key you create inside your own
-        account. Keys are encrypted with AES-256-GCM before storage and are decrypted only to
-        make a request you asked for. The messages in a tab go to that provider and are not
-        retained by Sentinel once the reply comes back. Revoke the key in your provider
-        account and the connection stops working immediately.
-      </p>
-    </div>
+      <h2>Where information comes from</h2>
+      <p>Threat knowledge comes from Sentinel&rsquo;s own database, community reports, and public feeds including OpenPhish, URLhaus (abuse.ch) and Phishing.Database. If configured, links are also checked against Google Safe Browsing. Registration details come from public RDAP registries.</p>
 
-    <div class="card" style="margin-top:22px">
-      <h2 style="font-size:1.15rem">Third parties</h2>
-      <p class="muted small" style="margin:0">
-        Where a Safe Browsing key is configured, addresses are also checked against Google
-        Safe Browsing. Google sign-in, if you choose it, shares your email, name and profile
-        picture with Sentinel and nothing more. Sentinel does not sell data to anyone.
-      </p>
-    </div>
+      <h2>Security</h2>
+      <p>Traffic is encrypted with TLS. Sessions use HttpOnly, SameSite cookies; passwords are hashed with scrypt; accounts lock after repeated failed sign-ins; two-factor authentication is available to everyone. Research requests run from isolated servers that refuse to connect to private networks.</p>
 
-    <div class="card" style="margin-top:22px">
-      <h2 style="font-size:1.15rem">Deleting your data</h2>
-      <p class="muted small" style="margin:0">
-        Ask at privacy@sentinelscamscan.com and your account, sessions, stored provider keys,
-        trusted sites and reports are deleted. Scan results cached by domain contain nothing
-        that identifies you and are discarded on a rolling basis.
-      </p>
-    </div>
+      <h2>Your choices</h2>
+      <p>You can delete your account at any time from <a  role="link" aria-disabled="true" title="Not available until launch">Security settings</a>, revoke any signed-in device, and remove trusted sites. Deleting your account removes your history, reports, usage and connected keys.</p>
 
-    <p class="small muted" style="margin-top:26px">
-      This page describes the beta and will be replaced by a full policy before general release.
-    </p>
-  </div>
-</section>
+      <h2>Contact</h2>
+      <p>Questions about privacy: <a href="mailto:privacy@usesentinel.technology">privacy@usesentinel.technology</a>.</p>
+    </div>
+  </section>
 </main>
-
-<footer class="site-footer">
-  <div class="wrap site-footer__grid">
-    <div>
-      <a class="brand" href="index.html">
-        <img class="logo-image" src="assets/img/sentinel.png" width="40" height="40" alt="">
-        <span class="brand__name">Sentinel</span>
-      </a>
+<footer class="footer">
+  <div class="wrap">
+    <div class="footer__grid">
+      <div class="footer__brand">
+        <a class="logo" href="index.html">
+          <span class="logo__mark"><svg viewBox="0 0 64 64" aria-hidden="true" focusable="false" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M32 2.6 57.4 10v18.6c0 14.6-9.9 24.6-25.4 31.4C16.5 53.2 6.6 43.2 6.6 28.6V10Zm0 4.2L10.6 13v15.6c0 12.2 8 20.7 21.4 26.8 13.4-6.1 21.4-14.6 21.4-26.8V13Z"/><g transform="translate(32 30.5) scale(.70) translate(-32 -30.5)"><path fill="currentColor" fill-rule="evenodd" d="M32 11.6c-5.6 0-10.4 1.8-12.6 5C18.4 18.1 18 19.9 18 21.8v7.8c0 3.8 1.2 7 3.4 9.8L32 49.4l10.6-10c2.2-2.8 3.4-6 3.4-9.8v-7.8c0-1.9-.4-3.7-1.4-5.2-2.2-3.2-7-5-12.6-5ZM21 23.4l8 3-.5 3.6-7.5-1.8ZM43 23.4l-8 3 .5 3.6 7.5-1.8ZM24.6 32l4.6 1.1v8.4l-3-3.4ZM39.4 32l-4.6 1.1v8.4l3-3.4Z"/><path fill="currentColor" fill-rule="evenodd" d="M42.8 16.2a2.3 2.3 0 1 1 0 4.6 2.3 2.3 0 0 1 0-4.6Z"/></g></svg></span>
+          Sentinel
+        </a>
+        <p>Scam, virus and malware protection that shows you the danger before you click.</p>
+      </div>
+      <div>
+        <h5>Product</h5>
+        <ul>
+          <li><a href="download.html">Download</a></li>
+          <li><a  role="link" aria-disabled="true" title="Not available until launch">Web app</a></li>
+          <li><a href="pricing.html">Pricing</a></li>
+          <li><a href="index.html#how">How it works</a></li>
+        </ul>
+      </div>
+      <div>
+        <h5>Account</h5>
+        <ul>
+          <li><a  role="link" aria-disabled="true" title="Not available until launch">Create account</a></li>
+          <li><a  role="link" aria-disabled="true" title="Not available until launch">Sign in</a></li>
+          <li><a  role="link" aria-disabled="true" title="Not available until launch">Security settings</a></li>
+        </ul>
+      </div>
+      <div>
+        <h5>Company</h5>
+        <ul>
+          <li><a href="privacy.html">Privacy</a></li>
+          <li><a href="terms.html">Terms</a></li>
+          <li><a href="mailto:support@usesentinel.technology">Support</a></li>
+        </ul>
+      </div>
     </div>
-    <nav>
-      <a href="download.html">Download</a>
-      <a href="login.html">Sign in</a>
-      <a href="privacy.html">Privacy</a>
-      <a href="terms.html">Terms</a>
-    </nav>
+    <div class="footer__base">
+      <span>&copy; <span data-year>2026</span> Sentinel. All rights reserved.</span>
+      <span class="mono">www.usesentinel.technology</span>
+    </div>
   </div>
 </footer>
 
-<script src="assets/js/config.js"></script>
 <script src="assets/js/masks.js"></script>
-<script src="assets/js/sentinel.js"></script>
-<script>Sentinel.paintHeader();</script>
+<script src="assets/js/site.js"></script>
 </body>
 </html>

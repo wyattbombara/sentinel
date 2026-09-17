@@ -2,99 +2,131 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Terms - Sentinel</title>
-<meta name="description" content="Terms of use for the Sentinel beta.">
-<link rel="icon" href="assets/img/sentinel.png" type="image/png">
+<script src="assets/js/static.js"></script>
+<script src="assets/js/boot.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0b0d">
+<meta name="color-scheme" content="dark">
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/img/icon-192.png">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="preload" href="assets/fonts/geist-normal-300-700.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="assets/fonts/instrument-serif-normal-400.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="assets/css/sentinel.css">
-<link rel="stylesheet" href="assets/css/pages.css">
-</head>
-<body>
+<link rel="stylesheet" href="assets/css/interactive.css">
+<meta property="og:site_name" content="Sentinel">
+<meta property="og:type" content="website">
+<meta property="og:image" content="https://wyattbombara.github.io/sentinel/assets/img/og.png">
+<meta name="twitter:card" content="summary_large_image">
 
-<header class="site-header">
-  <div class="wrap site-header__inner">
-    <a class="brand" href="index.html">
-      <img class="logo-image" src="assets/img/sentinel.png" width="40" height="40" alt="">
-      <span class="brand__name">Sentinel</span>
+<title>Terms · Sentinel</title>
+<meta name="description" content="Terms of use for Sentinel.">
+</head>
+<body class="has-prelaunch">
+<header class="nav" data-nav>
+  <div class="wrap nav__inner">
+    <a class="logo" href="index.html" aria-label="Sentinel home">
+      <span class="logo__mark"><svg viewBox="0 0 64 64" aria-hidden="true" focusable="false" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M32 2.6 57.4 10v18.6c0 14.6-9.9 24.6-25.4 31.4C16.5 53.2 6.6 43.2 6.6 28.6V10Zm0 4.2L10.6 13v15.6c0 12.2 8 20.7 21.4 26.8 13.4-6.1 21.4-14.6 21.4-26.8V13Z"/><g transform="translate(32 30.5) scale(.70) translate(-32 -30.5)"><path fill="currentColor" fill-rule="evenodd" d="M32 11.6c-5.6 0-10.4 1.8-12.6 5C18.4 18.1 18 19.9 18 21.8v7.8c0 3.8 1.2 7 3.4 9.8L32 49.4l10.6-10c2.2-2.8 3.4-6 3.4-9.8v-7.8c0-1.9-.4-3.7-1.4-5.2-2.2-3.2-7-5-12.6-5ZM21 23.4l8 3-.5 3.6-7.5-1.8ZM43 23.4l-8 3 .5 3.6 7.5-1.8ZM24.6 32l4.6 1.1v8.4l-3-3.4ZM39.4 32l-4.6 1.1v8.4l3-3.4Z"/><path fill="currentColor" fill-rule="evenodd" d="M42.8 16.2a2.3 2.3 0 1 1 0 4.6 2.3 2.3 0 0 1 0-4.6Z"/></g></svg></span>
+      Sentinel
     </a>
-    <nav class="page-nav" aria-label="Main">
-      <a href="index.html#how">How it works</a>
-      <a href="index.html#masks">The masks</a>
-      <a href="download.html">Download</a>
+    <nav class="nav__links" aria-label="Main">
+      <a href="index.html#masks" data-spy="masks">The masks</a>
+      <a href="index.html#how" data-spy="how">How it works</a>
+      <a href="index.html#game" data-spy="game">Spot the scam</a>
+      <a href="index.html#try" data-spy="try">Try a link</a>
+      <a href="pricing.html" data-spy="pricing">Pricing</a>
     </nav>
-    <div class="header-actions" data-auth-slot><a class="btn btn--sm" href="app.html">Preview dashboard</a></div>
+    <div class="nav__actions" data-auth-actions>
+      <a class="btn btn--ghost btn--sm is-soon" role="link" aria-disabled="true" title="Not available until launch">Sign in</a>
+      <a class="btn btn--gold btn--sm" href="download.html">Download</a>
+    </div>
+    <button class="nav__toggle" type="button" aria-label="Menu" aria-expanded="false" data-nav-toggle>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 8h16M4 16h16"/></svg>
+    </button>
   </div>
 </header>
 
 <main>
-<section class="tight">
-  <div class="wrap narrow">
-    <span class="eyebrow">Terms</span>
-    <h1 style="font-size:2rem">Terms of use</h1>
-    <p class="lede">Sentinel is in beta, and free to use while it is.</p>
-
-    <div class="card" style="margin:26px 0">
-      <h2 style="font-size:1.15rem">Sentinel is a warning, not a guarantee</h2>
-      <p class="muted small" style="margin:0">
-        Sentinel flags what it can detect. New scam sites appear constantly and no checker
-        catches all of them, so an unmarked link is not a promise of safety. In the other
-        direction, a yellow or orange mask means "look closer", not "this is criminal". Use
-        your own judgement before entering passwords or payment details anywhere.
-      </p>
+<div class="prelaunch" role="status"><b>Preview.</b> Sentinel hasn&rsquo;t launched yet, so accounts, scanning and downloads aren&rsquo;t available here. Everything else is the real product &mdash; the verdicts on this page come from Sentinel&rsquo;s own engine.</div>
+  <section class="page-head" style="padding-bottom:40px">
+    <div class="wrap-narrow">
+      <span class="kicker" data-reveal>Terms</span>
+      <h1 data-split>The <span class="serif italic">fine print</span></h1>
+      <p data-reveal>Plain-language terms for using Sentinel during its beta.</p>
+      <p class="updated" data-reveal>Last updated 16 September 2026 &middot; beta</p>
     </div>
+  </section>
 
-    <div class="card">
-      <h2 style="font-size:1.15rem">Your account</h2>
-      <p class="muted small" style="margin:0">
-        Keep your password to yourself and be accurate when you report a site. Deliberately
-        false reports, automated scraping of the scan API, and attempts to overload the
-        service will end your access.
-      </p>
+  <section class="prose-wrap">
+    <div class="wrap-narrow prose" data-reveal>
+      <h2>What Sentinel is</h2>
+      <p>Sentinel is a warning system. It tells you how risky a link, email or file looks and why. It reduces risk; it cannot remove it. A site without a mask is not guaranteed safe, and a mask is Sentinel&rsquo;s assessment, not a legal finding about anyone.</p>
+
+      <h2>Your account</h2>
+      <ul>
+        <li>Keep your sign-in details private and turn on two-factor authentication.</li>
+        <li>Don&rsquo;t use Sentinel to probe, attack or overload other people&rsquo;s systems, or to scan at volumes beyond your plan by creating extra accounts.</li>
+        <li>Only report sites you genuinely believe are harmful. False reports can get an account suspended.</li>
+      </ul>
+
+      <h2>Plans and allowances</h2>
+      <p>Each plan includes a weekly allowance of scans and live-scanning hours, reset every Monday at 00:00 UTC. Unused allowance does not roll over. Scans that fail because of a problem on our side are not counted.</p>
+
+      <h2>AI assistants</h2>
+      <p>Connecting ChatGPT, Claude, Gemini or DeepSeek is optional. Messages you send go to that provider under their terms and are billed to your key.</p>
+
+      <h2>Liability</h2>
+      <p>Sentinel is provided &ldquo;as is&rdquo; during beta. To the extent the law allows, Sentinel isn&rsquo;t liable for losses from threats it doesn&rsquo;t detect or from acting on its warnings.</p>
+
+      <h2>Contact</h2>
+      <p><a href="mailto:support@usesentinel.technology">support@usesentinel.technology</a></p>
     </div>
-
-    <div class="card" style="margin-top:22px">
-      <h2 style="font-size:1.15rem">Your AI provider accounts</h2>
-      <p class="muted small" style="margin:0">
-        The AI workspace uses API keys from your own OpenAI, Anthropic, Google or DeepSeek
-        accounts. That usage is billed by those providers to you, under their terms, and
-        Sentinel is not a party to that relationship.
-      </p>
-    </div>
-
-    <div class="card" style="margin-top:22px">
-      <h2 style="font-size:1.15rem">Liability</h2>
-      <p class="muted small" style="margin:0">
-        The beta is provided as-is, without warranty. Sentinel is not liable for losses
-        arising from a site it failed to flag, or from a legitimate site it flagged. If you
-        believe a site is rated wrongly, report it and it will be reviewed.
-      </p>
-    </div>
-
-    <p class="small muted" style="margin-top:26px">Contact: hello@sentinelscamscan.com</p>
-  </div>
-</section>
+  </section>
 </main>
-
-<footer class="site-footer">
-  <div class="wrap site-footer__grid">
-    <div>
-      <a class="brand" href="index.html">
-        <img class="logo-image" src="assets/img/sentinel.png" width="40" height="40" alt="">
-        <span class="brand__name">Sentinel</span>
-      </a>
+<footer class="footer">
+  <div class="wrap">
+    <div class="footer__grid">
+      <div class="footer__brand">
+        <a class="logo" href="index.html">
+          <span class="logo__mark"><svg viewBox="0 0 64 64" aria-hidden="true" focusable="false" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M32 2.6 57.4 10v18.6c0 14.6-9.9 24.6-25.4 31.4C16.5 53.2 6.6 43.2 6.6 28.6V10Zm0 4.2L10.6 13v15.6c0 12.2 8 20.7 21.4 26.8 13.4-6.1 21.4-14.6 21.4-26.8V13Z"/><g transform="translate(32 30.5) scale(.70) translate(-32 -30.5)"><path fill="currentColor" fill-rule="evenodd" d="M32 11.6c-5.6 0-10.4 1.8-12.6 5C18.4 18.1 18 19.9 18 21.8v7.8c0 3.8 1.2 7 3.4 9.8L32 49.4l10.6-10c2.2-2.8 3.4-6 3.4-9.8v-7.8c0-1.9-.4-3.7-1.4-5.2-2.2-3.2-7-5-12.6-5ZM21 23.4l8 3-.5 3.6-7.5-1.8ZM43 23.4l-8 3 .5 3.6 7.5-1.8ZM24.6 32l4.6 1.1v8.4l-3-3.4ZM39.4 32l-4.6 1.1v8.4l3-3.4Z"/><path fill="currentColor" fill-rule="evenodd" d="M42.8 16.2a2.3 2.3 0 1 1 0 4.6 2.3 2.3 0 0 1 0-4.6Z"/></g></svg></span>
+          Sentinel
+        </a>
+        <p>Scam, virus and malware protection that shows you the danger before you click.</p>
+      </div>
+      <div>
+        <h5>Product</h5>
+        <ul>
+          <li><a href="download.html">Download</a></li>
+          <li><a  role="link" aria-disabled="true" title="Not available until launch">Web app</a></li>
+          <li><a href="pricing.html">Pricing</a></li>
+          <li><a href="index.html#how">How it works</a></li>
+        </ul>
+      </div>
+      <div>
+        <h5>Account</h5>
+        <ul>
+          <li><a  role="link" aria-disabled="true" title="Not available until launch">Create account</a></li>
+          <li><a  role="link" aria-disabled="true" title="Not available until launch">Sign in</a></li>
+          <li><a  role="link" aria-disabled="true" title="Not available until launch">Security settings</a></li>
+        </ul>
+      </div>
+      <div>
+        <h5>Company</h5>
+        <ul>
+          <li><a href="privacy.html">Privacy</a></li>
+          <li><a href="terms.html">Terms</a></li>
+          <li><a href="mailto:support@usesentinel.technology">Support</a></li>
+        </ul>
+      </div>
     </div>
-    <nav>
-      <a href="download.html">Download</a>
-      <a href="login.html">Sign in</a>
-      <a href="privacy.html">Privacy</a>
-      <a href="terms.html">Terms</a>
-    </nav>
+    <div class="footer__base">
+      <span>&copy; <span data-year>2026</span> Sentinel. All rights reserved.</span>
+      <span class="mono">www.usesentinel.technology</span>
+    </div>
   </div>
 </footer>
 
-<script src="assets/js/config.js"></script>
 <script src="assets/js/masks.js"></script>
-<script src="assets/js/sentinel.js"></script>
-<script>Sentinel.paintHeader();</script>
+<script src="assets/js/site.js"></script>
 </body>
 </html>
