@@ -25,6 +25,20 @@
 <link rel="stylesheet" href="assets/css/pages.css">
 </head>
 <body>
+<!-- Recolor the supplied logo in the browser while retaining its shading. -->
+<svg width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute">
+  <defs>
+    <filter id="sentinel-yellow" color-interpolation-filters="sRGB">
+      <feColorMatrix type="matrix" values=".245 .825 .083 0 0 .197 .663 .067 0 0 .066 .222 .022 0 0 0 0 0 1 0"/>
+    </filter>
+    <filter id="sentinel-orange" color-interpolation-filters="sRGB">
+      <feColorMatrix type="matrix" values=".240 .808 .082 0 0 .138 .464 .047 0 0 .036 .121 .012 0 0 0 0 0 1 0"/>
+    </filter>
+    <filter id="sentinel-red" color-interpolation-filters="sRGB">
+      <feColorMatrix type="matrix" values=".229 .771 .078 0 0 .072 .242 .024 0 0 .077 .259 .026 0 0 0 0 0 1 0"/>
+    </filter>
+  </defs>
+</svg>
 <a class="skip-link" href="#main">Skip to content</a>
 <header class="nav" data-nav>
   <div class="wrap nav__inner">
@@ -163,12 +177,12 @@
       <div class="section__head">
         <span class="kicker" data-reveal>The masks</span>
         <h2 data-split>Three masks.<br><span class="serif italic">One glance.</span></h2>
-        <p data-reveal>Every threat gets its own face, and every face gets a colour. Yellow means look closer. Orange means it&rsquo;s probably dangerous. Red means Sentinel has proof.</p>
+        <p data-reveal>One Sentinel shield, three kinds of threat. Its colour shows the severity: yellow means look closer, orange means it&rsquo;s probably dangerous, and red means Sentinel has proof.</p>
       </div>
 
       <div class="trio" data-reveal="scale">
-        <article class="mask-card" style="--c:var(--red)" data-trio>
-          <div class="mask-card__glyph" data-glyph="scam"></div>
+        <article class="mask-card" style="--c:var(--red)" data-trio data-severity="red">
+          <div class="mask-card__glyph"><img src="assets/img/sentinel.png" width="92" height="92" alt=""></div>
           <h3>Scam</h3>
           <p>Sites built to take your money, passwords or wallet.</p>
           <ul>
@@ -182,8 +196,8 @@
             <button type="button" data-sev="red" style="--sc:var(--red)" aria-pressed="true">Confirmed</button>
           </div>
         </article>
-        <article class="mask-card" style="--c:var(--orange)" data-trio>
-          <div class="mask-card__glyph" data-glyph="virus"></div>
+        <article class="mask-card" style="--c:var(--orange)" data-trio data-severity="orange">
+          <div class="mask-card__glyph"><img src="assets/img/sentinel.png" width="92" height="92" alt=""></div>
           <h3>Virus</h3>
           <p>Files that infect your computer the moment they run.</p>
           <ul>
@@ -197,8 +211,8 @@
             <button type="button" data-sev="red" style="--sc:var(--red)" aria-pressed="false">Detected</button>
           </div>
         </article>
-        <article class="mask-card" style="--c:var(--yellow)" data-trio>
-          <div class="mask-card__glyph" data-glyph="malware"></div>
+        <article class="mask-card" style="--c:var(--yellow)" data-trio data-severity="yellow">
+          <div class="mask-card__glyph"><img src="assets/img/sentinel.png" width="92" height="92" alt=""></div>
           <h3>Malware</h3>
           <p>Pages and documents that attack from the inside.</p>
           <ul>

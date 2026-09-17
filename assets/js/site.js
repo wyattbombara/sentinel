@@ -210,6 +210,7 @@
     buttons.forEach((b) => b.addEventListener('click', () => {
       buttons.forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
       card.style.setProperty('--c', colors[b.dataset.sev]);
+      card.dataset.severity = b.dataset.sev;
     }));
   }
 

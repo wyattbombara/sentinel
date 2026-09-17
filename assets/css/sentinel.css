@@ -264,7 +264,14 @@ p { text-wrap: pretty; }
 }
 .hero__pill b { font-weight: 500; color: var(--gold-200); background: rgba(212, 174, 99, .12); padding: 3px 9px; border-radius: 99px; font-size: 12px; }
 .hero h1 { font-size: clamp(44px, 7.4vw, 96px); line-height: .98; letter-spacing: -.035em; font-weight: 500; }
-.hero h1 .serif { font-size: 1.08em; letter-spacing: -.02em; }
+.hero h1 .serif {
+  font-size: 1.08em;
+  letter-spacing: -.02em;
+  line-height: 1.18;
+  /* Gradient text needs painted space below the baseline for italic descenders. */
+  padding: 0 .04em .16em;
+  margin: 0 -.04em -.16em;
+}
 .hero__lede { margin: 28px auto 0; max-width: 620px; font-size: clamp(17px, 2vw, 19.5px); color: var(--text-2); line-height: 1.55; }
 .hero__cta { margin-top: 38px; display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; }
 .hero__fine { margin-top: 18px; font-size: 13px; color: var(--muted); }
@@ -393,14 +400,18 @@ p { text-wrap: pretty; }
 
 /* ------------------------------------------------------------ three masks */
 
-.trio { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--line); border-radius: var(--r-xl); overflow: hidden; box-shadow: 0 0 0 1px var(--line); }
+.trio { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--line); border-radius: var(--r-xl); overflow: clip; box-shadow: 0 0 0 1px var(--line); }
 @media (max-width: 900px) { .trio { grid-template-columns: 1fr; } }
-.mask-card { position: relative; background: var(--bg-2); padding: 40px 36px 36px; overflow: hidden; }
-.mask-card::before { content: ''; position: absolute; inset: auto -30% -60% -30%; height: 80%; background: radial-gradient(closest-side, color-mix(in srgb, var(--c) 18%, transparent), transparent); opacity: .0; transition: opacity .6s var(--ease); }
+.mask-card { position: relative; background: var(--bg-2); padding: 40px 36px 36px; overflow: clip; }
+.mask-card::before { content: ''; position: absolute; pointer-events: none; inset: auto -30% -60% -30%; height: 80%; background: radial-gradient(closest-side, color-mix(in srgb, var(--c) 18%, transparent), transparent); opacity: .0; transition: opacity .6s var(--ease); }
 .mask-card:hover::before { opacity: 1; }
 .mask-card__glyph { width: 92px; height: 92px; color: var(--c); transition: color .5s var(--ease), transform .6s var(--ease); }
 .mask-card:hover .mask-card__glyph { transform: translateY(-4px) rotate(-3deg); }
 .mask-card__glyph svg { width: 100%; height: 100%; filter: drop-shadow(0 12px 30px color-mix(in srgb, var(--c) 35%, transparent)); }
+.mask-card__glyph img { width: 100%; height: 100%; object-fit: contain; border-radius: 16px; }
+.mask-card[data-severity="yellow"] .mask-card__glyph img { filter: url('#sentinel-yellow'); }
+.mask-card[data-severity="orange"] .mask-card__glyph img { filter: url('#sentinel-orange'); }
+.mask-card[data-severity="red"] .mask-card__glyph img { filter: url('#sentinel-red'); }
 .mask-card h3 { margin-top: 28px; font-size: 26px; }
 .mask-card p { margin-top: 10px; color: var(--text-2); font-size: 15px; }
 .mask-card ul { list-style: none; margin: 22px 0 0; padding: 0; display: grid; gap: 8px; font-size: 14px; color: var(--muted); }
