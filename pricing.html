@@ -28,7 +28,7 @@
 <header class="nav" data-nav>
   <div class="wrap nav__inner">
     <a class="logo" href="index.html" aria-label="Sentinel home">
-      <span class="logo__mark"><svg viewBox="0 0 64 64" aria-hidden="true" focusable="false" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M32 2.6 57.4 10v18.6c0 14.6-9.9 24.6-25.4 31.4C16.5 53.2 6.6 43.2 6.6 28.6V10Zm0 4.2L10.6 13v15.6c0 12.2 8 20.7 21.4 26.8 13.4-6.1 21.4-14.6 21.4-26.8V13Z"/><g transform="translate(32 30.5) scale(.70) translate(-32 -30.5)"><path fill="currentColor" fill-rule="evenodd" d="M32 11.6c-5.6 0-10.4 1.8-12.6 5C18.4 18.1 18 19.9 18 21.8v7.8c0 3.8 1.2 7 3.4 9.8L32 49.4l10.6-10c2.2-2.8 3.4-6 3.4-9.8v-7.8c0-1.9-.4-3.7-1.4-5.2-2.2-3.2-7-5-12.6-5ZM21 23.4l8 3-.5 3.6-7.5-1.8ZM43 23.4l-8 3 .5 3.6 7.5-1.8ZM24.6 32l4.6 1.1v8.4l-3-3.4ZM39.4 32l-4.6 1.1v8.4l3-3.4Z"/><path fill="currentColor" fill-rule="evenodd" d="M42.8 16.2a2.3 2.3 0 1 1 0 4.6 2.3 2.3 0 0 1 0-4.6Z"/></g></svg></span>
+      <span class="logo__mark"><svg viewBox="0 0 64 64" aria-hidden="true" focusable="false"><path fill="currentColor" fill-rule="evenodd" d="M32 2.6 57.4 10v18.6c0 14.6-9.9 24.6-25.4 31.4C16.5 53.2 6.6 43.2 6.6 28.6V10Zm0 4.2L10.6 13v15.6c0 12.2 8 20.7 21.4 26.8 13.4-6.1 21.4-14.6 21.4-26.8V13Z"/><g transform="translate(32 30.5) scale(.70) translate(-32 -30.5)"><path fill="currentColor" fill-rule="evenodd" d="M32 11.6c-5.6 0-10.4 1.8-12.6 5C18.4 18.1 18 19.9 18 21.8v7.8c0 3.8 1.2 7 3.4 9.8L32 49.4l10.6-10c2.2-2.8 3.4-6 3.4-9.8v-7.8c0-1.9-.4-3.7-1.4-5.2-2.2-3.2-7-5-12.6-5ZM21 23.4l8 3-.5 3.6-7.5-1.8ZM43 23.4l-8 3 .5 3.6 7.5-1.8ZM24.6 32l4.6 1.1v8.4l-3-3.4ZM39.4 32l-4.6 1.1v8.4l3-3.4Z"/><path fill="currentColor" fill-rule="evenodd" d="M42.8 16.2a2.3 2.3 0 1 1 0 4.6 2.3 2.3 0 0 1 0-4.6Z"/></g></svg></span>
       Sentinel
     </a>
     <nav class="nav__links" aria-label="Main">
@@ -49,12 +49,12 @@
 </header>
 
 <main>
-<div class="prelaunch" role="status"><b>Preview.</b> Sentinel hasn&rsquo;t launched yet, so accounts, scanning and downloads aren&rsquo;t available here. Everything else is the real product &mdash; the verdicts on this page come from Sentinel&rsquo;s own engine.</div>
+<div class="prelaunch" role="status"><b>Preview.</b> Sentinel hasn&rsquo;t launched yet, so accounts, scanning and downloads aren&rsquo;t available here. Everything else is the real product: the verdicts on this page come from Sentinel&rsquo;s own engine.</div>
   <section class="page-head" style="padding-bottom:50px">
     <div class="wrap">
       <span class="kicker" data-reveal>Pricing</span>
       <h1 data-split>Simple plans.<br><span class="serif italic gold-text">Serious protection.</span></h1>
-      <p data-reveal>Start free with manual scans. Upgrade when you want Sentinel watching in real time.</p>
+      <p data-reveal>Start free with manual scans and 15 minutes of live scanning a week. Upgrade for more time and research.</p>
     </div>
   </section>
 
@@ -63,7 +63,7 @@
       <div class="finder" data-finder data-reveal>
   <div class="finder__q">
     <span class="finder__label">Masks while you browse and read email?</span>
-    <div class="seg" role="radiogroup" aria-label="Live protection">
+    <div class="seg-toggle" role="radiogroup" aria-label="Live protection">
       <button type="button" role="radio" aria-checked="false" data-f-live="no">Not needed</button>
       <button type="button" role="radio" aria-checked="true" data-f-live="yes">Yes please</button>
     </div>
@@ -74,7 +74,7 @@
   </div>
   <div class="finder__q">
     <span class="finder__label">Paste suspicious emails in for a check?</span>
-    <div class="seg" role="radiogroup" aria-label="Email scans">
+    <div class="seg-toggle" role="radiogroup" aria-label="Email scans">
       <button type="button" role="radio" aria-checked="true" data-f-email="no">No</button>
       <button type="button" role="radio" aria-checked="false" data-f-email="yes">Yes</button>
     </div>
@@ -105,7 +105,7 @@
     <a class="btn btn--gold btn--block is-soon"  data-plan-cta="pro" role="link" aria-disabled="true" title="Not available until launch">Get Pro</a>
     <ul class="plan__list">
       <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 5 5 9-10"/></svg><span><b>24 hours</b> of fast live scanning a week</span></li>
-      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 5 5 9-10"/></svg><span><b>4 hours</b> of delicate live scanning a week</span></li>
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 5 5 9-10"/></svg><span><b>4 hours</b> of delicate live scanning a week, every result researched</span></li>
       <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 5 5 9-10"/></svg><span><b>40</b> researched link scans a week</span></li>
       <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 5 5 9-10"/></svg><span><b>40</b> virus &amp; malware scans a week</span></li>
       <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 5 5 9-10"/></svg><span>All three masks: scam, virus, malware</span></li>
@@ -117,12 +117,11 @@
   <article class="plan" data-plan-card="max" data-reveal style="--d:.16s">
     <div class="plan__name">Max</div>
     <div class="plan__price"><b>$40</b><span>/ month</span></div>
-    <p class="plan__desc">Every result researched. Every email checkable.</p>
+    <p class="plan__desc">More delicate scanning. Every email checkable.</p>
     <a class="btn btn--gold btn--block is-soon"  data-plan-cta="max" role="link" aria-disabled="true" title="Not available until launch">Get Max</a>
     <ul class="plan__list">
       <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 5 5 9-10"/></svg><span><b>Unlimited</b> fast live scanning</span></li>
-      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 5 5 9-10"/></svg><span><b>24 hours</b> of delicate live scanning a week</span></li>
-      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 5 5 9-10"/></svg><span><b>Research on every live result</b></span></li>
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 5 5 9-10"/></svg><span><b>24 hours</b> of delicate live scanning a week, every result researched</span></li>
       <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 5 5 9-10"/></svg><span><b>100</b> researched link scans a week</span></li>
       <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 5 5 9-10"/></svg><span><b>100</b> virus &amp; malware scans a week</span></li>
       <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 5 5 9-10"/></svg><span>Paste any email in for a full scan</span></li>
@@ -138,10 +137,9 @@
     <a class="btn btn--gold btn--block is-soon"  data-plan-cta="ultimate" role="link" aria-disabled="true" title="Not available until launch">Get Ultimate</a>
     <ul class="plan__list">
       <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 5 5 9-10"/></svg><span><b>Unlimited</b> fast live scanning</span></li>
-      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 5 5 9-10"/></svg><span><b>96 hours</b> of delicate live scanning a week</span></li>
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 5 5 9-10"/></svg><span><b>96 hours</b> of delicate live scanning a week, every result researched</span></li>
       <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 5 5 9-10"/></svg><span><b>500</b> researched link scans a week</span></li>
       <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 5 5 9-10"/></svg><span><b>500</b> virus &amp; malware scans a week</span></li>
-      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 5 5 9-10"/></svg><span>Research on every live result</span></li>
       <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 5 5 9-10"/></svg><span>Full email scans &amp; download protection</span></li>
       <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 5 5 9-10"/></svg><span>Everything in Max</span></li>
     </ul>
@@ -178,7 +176,7 @@
     <div class="footer__grid">
       <div class="footer__brand">
         <a class="logo" href="index.html">
-          <span class="logo__mark"><svg viewBox="0 0 64 64" aria-hidden="true" focusable="false" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M32 2.6 57.4 10v18.6c0 14.6-9.9 24.6-25.4 31.4C16.5 53.2 6.6 43.2 6.6 28.6V10Zm0 4.2L10.6 13v15.6c0 12.2 8 20.7 21.4 26.8 13.4-6.1 21.4-14.6 21.4-26.8V13Z"/><g transform="translate(32 30.5) scale(.70) translate(-32 -30.5)"><path fill="currentColor" fill-rule="evenodd" d="M32 11.6c-5.6 0-10.4 1.8-12.6 5C18.4 18.1 18 19.9 18 21.8v7.8c0 3.8 1.2 7 3.4 9.8L32 49.4l10.6-10c2.2-2.8 3.4-6 3.4-9.8v-7.8c0-1.9-.4-3.7-1.4-5.2-2.2-3.2-7-5-12.6-5ZM21 23.4l8 3-.5 3.6-7.5-1.8ZM43 23.4l-8 3 .5 3.6 7.5-1.8ZM24.6 32l4.6 1.1v8.4l-3-3.4ZM39.4 32l-4.6 1.1v8.4l3-3.4Z"/><path fill="currentColor" fill-rule="evenodd" d="M42.8 16.2a2.3 2.3 0 1 1 0 4.6 2.3 2.3 0 0 1 0-4.6Z"/></g></svg></span>
+          <span class="logo__mark"><svg viewBox="0 0 64 64" aria-hidden="true" focusable="false"><path fill="currentColor" fill-rule="evenodd" d="M32 2.6 57.4 10v18.6c0 14.6-9.9 24.6-25.4 31.4C16.5 53.2 6.6 43.2 6.6 28.6V10Zm0 4.2L10.6 13v15.6c0 12.2 8 20.7 21.4 26.8 13.4-6.1 21.4-14.6 21.4-26.8V13Z"/><g transform="translate(32 30.5) scale(.70) translate(-32 -30.5)"><path fill="currentColor" fill-rule="evenodd" d="M32 11.6c-5.6 0-10.4 1.8-12.6 5C18.4 18.1 18 19.9 18 21.8v7.8c0 3.8 1.2 7 3.4 9.8L32 49.4l10.6-10c2.2-2.8 3.4-6 3.4-9.8v-7.8c0-1.9-.4-3.7-1.4-5.2-2.2-3.2-7-5-12.6-5ZM21 23.4l8 3-.5 3.6-7.5-1.8ZM43 23.4l-8 3 .5 3.6 7.5-1.8ZM24.6 32l4.6 1.1v8.4l-3-3.4ZM39.4 32l-4.6 1.1v8.4l3-3.4Z"/><path fill="currentColor" fill-rule="evenodd" d="M42.8 16.2a2.3 2.3 0 1 1 0 4.6 2.3 2.3 0 0 1 0-4.6Z"/></g></svg></span>
           Sentinel
         </a>
         <p>Scam, virus and malware protection that shows you the danger before you click.</p>
