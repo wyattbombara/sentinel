@@ -2,16 +2,19 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; connect-src 'self' https://wyattbombara.github.io/sentinel https://api.github.com; object-src 'none'; base-uri 'none'; form-action 'self' https://wyattbombara.github.io/sentinel">
+<meta name="referrer" content="strict-origin-when-cross-origin">
 <script src="assets/js/static.js"></script>
 <script src="assets/js/boot.js"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0a0b0d">
-<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0a0b0d" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f6f4ef" media="(prefers-color-scheme: light)">
+<meta name="color-scheme" content="dark light">
 <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="assets/img/icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="preload" href="assets/fonts/geist-normal-300-700.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="preload" href="assets/fonts/instrument-serif-normal-400.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="assets/fonts/atkinson-hyperlegible-next-normal-400-700.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="assets/fonts/bricolage-grotesque-normal-400-800.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="assets/css/sentinel.css">
 <link rel="stylesheet" href="assets/css/interactive.css">
 <meta property="og:site_name" content="Sentinel">
@@ -25,6 +28,7 @@
 <meta property="og:url" content="https://wyattbombara.github.io/sentinel/pricing">
 </head>
 <body class="has-prelaunch">
+<a class="skip-link" href="#main">Skip to content</a>
 <header class="nav" data-nav>
   <div class="wrap nav__inner">
     <a class="logo" href="index.html" aria-label="Sentinel home">
@@ -38,6 +42,10 @@
       <a href="index.html#try" data-spy="try">Try a link</a>
       <a href="pricing.html" data-spy="pricing">Pricing</a>
     </nav>
+    <button class="theme-toggle" type="button" data-theme-toggle aria-label="Change theme">
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 3.5a8.5 8.5 0 0 1 0 17Z" fill="currentColor"/></svg>
+      <span data-theme-label>Auto</span>
+    </button>
     <div class="nav__actions" data-auth-actions>
       <a class="btn btn--ghost btn--sm is-soon" role="link" aria-disabled="true" title="Not available until launch">Sign in</a>
       <a class="btn btn--gold btn--sm" href="download.html">Download</a>
@@ -48,7 +56,7 @@
   </div>
 </header>
 
-<main>
+<main id="main">
 <div class="prelaunch" role="status"><b>Preview.</b> Sentinel hasn&rsquo;t launched yet, so accounts, scanning and downloads aren&rsquo;t available here. Everything else is the real product: the verdicts on this page come from Sentinel&rsquo;s own engine.</div>
   <section class="page-head" style="padding-bottom:50px">
     <div class="wrap">
@@ -85,7 +93,7 @@
 <div class="pricing" data-pricing>
   <article class="plan" data-plan-card="free" data-reveal>
     <div class="plan__name">Free</div>
-    <div class="plan__price"><b>$0</b><span>forever</span></div>
+    <div class="plan__price"><b>$0</b><span>no card</span></div>
     <p class="plan__desc">Check any link or file you&rsquo;re unsure about.</p>
     <a class="btn btn--block is-soon"  data-plan-cta="free" role="link" aria-disabled="true" title="Not available until launch">Create free account</a>
     <ul class="plan__list">
@@ -130,10 +138,9 @@
   </article>
 
   <article class="plan plan--ultimate" data-plan-card="ultimate" data-reveal style="--d:.24s">
-    <span class="plan__badge plan__badge--best">Best protection</span>
     <div class="plan__name">Ultimate</div>
     <div class="plan__price"><b>$100</b><span>/ month</span></div>
-    <p class="plan__desc">Our most complete protection, with the most delicate scanning.</p>
+    <p class="plan__desc">Everything in Max, with 96 hours of delicate scanning a week.</p>
     <a class="btn btn--gold btn--block is-soon"  data-plan-cta="ultimate" role="link" aria-disabled="true" title="Not available until launch">Get Ultimate</a>
     <ul class="plan__list">
       <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 5 5 9-10"/></svg><span><b>Unlimited</b> fast live scanning</span></li>
@@ -160,7 +167,7 @@
             <tr><td>Research on link scans</td><td class="no">No</td><td class="yes">&check;</td><td class="yes">&check;</td><td class="yes">&check;</td></tr>
             <tr><td>Research on live results (delicate scanning)</td><td class="no">No</td><td class="yes">&check;</td><td class="yes">&check;</td><td class="yes">&check;</td></tr>
             <tr><td>Virus &amp; malware masks on links</td><td class="no">No</td><td class="yes">&check;</td><td class="yes">&check;</td><td class="yes">&check;</td></tr>
-            <tr><td>Email masks in Gmail &amp; Outlook (optional browser add-on)</td><td class="no">No</td><td class="yes">&check;</td><td class="yes">&check;</td><td class="yes">&check;</td></tr>
+            <tr><td>Email masks in Gmail &amp; Outlook (Windows app, or the browser add-on)</td><td class="no">No</td><td class="yes">&check;</td><td class="yes">&check;</td><td class="yes">&check;</td></tr>
             <tr><td>Paste-in email scans</td><td class="no">No</td><td class="no">No</td><td class="yes">&check;</td><td class="yes">&check;</td></tr>
             <tr><td>Download protection (Sentinel app)</td><td class="no">No</td><td class="yes">&check;</td><td class="yes">&check;</td><td class="yes">&check;</td></tr>
             <tr><td>Two-factor sign-in &amp; device management</td><td class="yes">&check;</td><td class="yes">&check;</td><td class="yes">&check;</td><td class="yes">&check;</td></tr>
@@ -203,6 +210,7 @@
         <ul>
           <li><a href="privacy.html">Privacy</a></li>
           <li><a href="terms.html">Terms</a></li>
+          <li><a href="refunds.html">Refunds</a></li>
           <li><a href="mailto:support@usesentinel.technology">Support</a></li>
         </ul>
       </div>
