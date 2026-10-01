@@ -2,6 +2,16 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<base href="/sentinel/">
+<script>
+// Resolve every asset and recovery link from the site root, even on nested 404s.
+// Root-hosted local previews use / instead of the published GitHub Pages path.
+(() => {
+  const base = document.querySelector('base');
+  const sitePath = new URL(base.href).pathname;
+  if (location.pathname !== sitePath.slice(0, -1) && !location.pathname.startsWith(sitePath)) base.href = '/';
+})();
+</script>
 <script src="assets/js/static.js"></script>
 <script src="assets/js/boot.js"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
