@@ -1,0 +1,791 @@
+diff --git a/404.html b/404.html
+index 4afbeaf..7d33281 100644
+--- a/404.html
++++ b/404.html
+@@ -2,6 +2,16 @@
+ <html lang="en">
+ <head>
+ <meta charset="utf-8">
++<base href="/sentinel/">
++<script>
++// Resolve every asset and recovery link from the site root, even on nested 404s.
++// Root-hosted local previews use / instead of the published GitHub Pages path.
++(() => {
++  const base = document.querySelector('base');
++  const sitePath = new URL(base.href).pathname;
++  if (location.pathname !== sitePath.slice(0, -1) && !location.pathname.startsWith(sitePath)) base.href = '/';
++})();
++</script>
+ <script src="assets/js/static.js"></script>
+ <script src="assets/js/boot.js"></script>
+ <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+@@ -47,7 +57,7 @@
+ </header>
+ 
+ <main>
+-<div class="prelaunch" role="status"><b>Preview.</b> Sentinel hasn&rsquo;t launched yet, so accounts, scanning and downloads aren&rsquo;t available here. Everything else is the real product: the verdicts on this page come from Sentinel&rsquo;s own engine.</div>
++<div class="prelaunch" role="status"><b>Website preview.</b> Accounts and website scanning aren&rsquo;t available here. <a href="https://github.com/zzilinct/Sentinel/releases/tag/v1.7.0">Download Sentinel v1.7.0</a> to use the app. The example verdicts on this page come from Sentinel&rsquo;s own engine.</div>
+   <section class="page-head" style="min-height:78vh;display:grid;place-items:center">
+     <div class="wrap-narrow">
+       <div class="mask-card__glyph" style="--c:var(--gold-400);margin:0 auto 20px;color:var(--gold-400)" data-glyph="scam" data-reveal="scale"></div>
+diff --git a/README.md b/README.md
+index a557be4..133f947 100644
+--- a/README.md
++++ b/README.md
+@@ -6,16 +6,18 @@
+ 
+ # Sentinel website
+ 
+-Static product preview. There is currently no API, account service, payment integration or downloadable extension in this repository.
++Static product preview. This export has no API, account service or payment integration. Website submissions do not scan links; the homepage examples use verdicts baked into `assets/js/static.js`.
+ 
+ To preview locally, run `python -m http.server 8765 --bind 127.0.0.1` from this directory, then open `http://127.0.0.1:8765/index.html`.
+ 
+ Run the dependency-free regression checks with `node --test tests/site.test.cjs` (Node 18 or later).
+ 
+-The original supplied logo is `assets/img/sentinel.png`. Navigation, browser icons, the manifest and every threat illustration use it. `assets/js/masks.js` adds severity cues: a normal yellow shield, angular orange details, and red horns. These variants are shared by the marketing demos, threat cards and dashboard verdicts.
++If the environment blocks the test runner from spawning a child process, run `node tests/site.test.cjs` instead. Both commands execute the same tests. Checks cover root and `/sentinel/` deployments, nested 404 recovery, fonts, manifest targets, preview submissions, homepage compatibility, severity controls, release metadata failures, script parsing and pricing.
+ 
+-`assets/js/config.js` keeps online features disabled until a backend is implemented. See [SERVER-REPORT.md](SERVER-REPORT.md) for the existing API expectations and outstanding work. Keep this disabled until the API is ready; toggling it does not create a backend.
++The download page and preview notices link to [Sentinel v1.7.0](https://github.com/zzilinct/Sentinel/releases/tag/v1.7.0). `assets/js/download.js` optionally retrieves metadata for that tag; missing assets, rate limiting or offline requests leave the release-page link available.
+ 
+-Pricing: Free $0, Pro $15/month, Max $40/month, Ultimate $100/month. Ultimate includes every Max feature, uncapped live scanning hours, 500 researched link scans per week and 500 virus/malware scans per week. These are planned offerings, not enforced subscriptions.
++Fonts and manifest URLs are relative to their files, so they work at the domain root and under the GitHub Pages `/sentinel/` path. The manifest opens the preview homepage and links to existing marketing pages. `404.html` sets a site-root base before loading assets, with a fallback for root-hosted local previews.
+ 
+-For a future extension release, publish a ZIP in `downloads/`, then set `available`, `version` and a site-relative `download` URL in `downloads/latest.json`. The page only enables downloading after the archive responds successfully and is not an HTML fallback page.
++`assets/js/masks.js` provides shared SVG brand and threat glyphs. `site.js` supplies the navigation, reveals and an `IntersectionObserver` fallback; `home.js` uses that fallback for the hero and game as well as severity cards.
++
++Pricing shown in the preview: Free $0, Pro $15/month, Max $40/month and Ultimate $100/month. This static website does not sell subscriptions or enforce quotas. [SERVER-REPORT.md](SERVER-REPORT.md) is an older backend-gap report, not a description of a running service in this export.
+diff --git a/assets/css/sentinel.css b/assets/css/sentinel.css
+index c144238..9bc754a 100644
+--- a/assets/css/sentinel.css
++++ b/assets/css/sentinel.css
+@@ -1,4 +1,4 @@
+-@import url('/assets/fonts/fonts.css');
++@import url('../fonts/fonts.css');
+ 
+ /* =============================================================================
+    Sentinel - graphite & gold
+diff --git a/assets/fonts/fonts.css b/assets/fonts/fonts.css
+index 080c527..a4c4d6a 100644
+--- a/assets/fonts/fonts.css
++++ b/assets/fonts/fonts.css
+@@ -4,7 +4,7 @@
+   font-style: normal;
+   font-weight: 300 700;
+   font-display: swap;
+-  src: url('/assets/fonts/geist-normal-300-700.woff2') format('woff2');
++  src: url('geist-normal-300-700.woff2') format('woff2');
+ }
+ 
+ @font-face {
+@@ -12,7 +12,7 @@
+   font-style: normal;
+   font-weight: 400 600;
+   font-display: swap;
+-  src: url('/assets/fonts/geist-mono-normal-400-600.woff2') format('woff2');
++  src: url('geist-mono-normal-400-600.woff2') format('woff2');
+ }
+ 
+ @font-face {
+@@ -20,7 +20,7 @@
+   font-style: italic;
+   font-weight: 400;
+   font-display: swap;
+-  src: url('/assets/fonts/instrument-serif-italic-400.woff2') format('woff2');
++  src: url('instrument-serif-italic-400.woff2') format('woff2');
+ }
+ 
+ @font-face {
+@@ -28,5 +28,5 @@
+   font-style: normal;
+   font-weight: 400;
+   font-display: swap;
+-  src: url('/assets/fonts/instrument-serif-normal-400.woff2') format('woff2');
++  src: url('instrument-serif-normal-400.woff2') format('woff2');
+ }
+diff --git a/assets/js/download.js b/assets/js/download.js
+index dc640fa..08a5140 100644
+--- a/assets/js/download.js
++++ b/assets/js/download.js
+@@ -1,4 +1,4 @@
+-/* Download page: real release details from GitHub, or an honest "not published yet". */
++/* Optional metadata for the pinned release; the release-page link always works. */
+ (() => {
+   'use strict';
+   const button = document.querySelector('[data-installer]');
+@@ -8,7 +8,7 @@
+   const esc = (v) => String(v == null ? '' : v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+   const mb = (n) => `${(n / 1048576).toFixed(0)} MB`;
+ 
+-  fetch(`https://api.github.com/repos/${button.dataset.releases}/releases/latest`, { headers: { Accept: 'application/vnd.github+json' } })
++  fetch(`https://api.github.com/repos/${button.dataset.releases}/releases/tags/${encodeURIComponent(button.dataset.releaseTag)}`, { headers: { Accept: 'application/vnd.github+json' } })
+     .then((r) => (r.ok ? r.json() : null))
+     .then((release) => {
+       const asset = release && (release.assets || []).find((a) => a.name === 'Sentinel-Setup.exe');
+@@ -16,12 +16,7 @@
+         meta.innerHTML = `<span>Version ${esc(String(release.tag_name).replace(/^v/, ''))}</span><span>${mb(asset.size)}</span><span>Windows 10 &amp; 11, 64-bit</span>`;
+         return;
+       }
+-      // No release yet: say so rather than hand out a link that 404s.
+-      button.removeAttribute('href');
+-      button.classList.add('is-soon');
+-      button.setAttribute('aria-disabled', 'true');
+-      button.lastChild.textContent = ' Windows build not published yet';
+-      meta.innerHTML = '<span>The first release is being prepared</span>';
++      // Missing assets or unavailable metadata must not disable the release page.
+     })
+-    .catch(() => { /* offline or rate-limited: the link still reaches the latest release */ });
++    .catch(() => { /* Keep the pinned link and static version details when offline or rate-limited. */ });
+ })();
+diff --git a/assets/js/home.js b/assets/js/home.js
+index 2b4ba80..7a884f7 100644
+--- a/assets/js/home.js
++++ b/assets/js/home.js
+@@ -180,7 +180,7 @@
+     replay.addEventListener('click', () => play(current));
+ 
+     let started = false;
+-    new IntersectionObserver((entries, obs) => {
++    new Site.Observer((entries, obs) => {
+       if (!entries[0].isIntersecting) return;
+       obs.disconnect();
+       stage.classList.add('is-in');
+@@ -424,7 +424,7 @@
+ 
+     // Number keys answer while the game is on screen.
+     let gameVisible = false;
+-    new IntersectionObserver((e) => { gameVisible = e[0].isIntersecting; }, { threshold: 0.15 }).observe(game);
++    new Site.Observer((e) => { gameVisible = e[0].isIntersecting; }, { threshold: 0.15 }).observe(game);
+     document.addEventListener('keydown', (ev) => {
+       if (!gameVisible || answered || ev.altKey || ev.ctrlKey || ev.metaKey) return;
+       if (/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName)) return;
+@@ -451,9 +451,8 @@
+       const url = input.value.trim();
+       if (!url) return;
+       if (window.SENTINEL_STATIC) {
+-        const site = window.SENTINEL_STATIC.origin;
+-        out.innerHTML = `<div class="try__empty"><p>This preview can&rsquo;t reach the scanner. Check this link on the live site. No account needed.</p>`
+-          + `<a class="btn btn--gold btn--sm" href="${site}/#try">Open ${esc(site.replace(/^https?:\/\//, ''))}</a></div>`;
++        out.innerHTML = '<div class="try__empty"><p>Link scanning isn&rsquo;t available on this website preview. Download Sentinel v1.7.0 to check links in the app.</p>'
++          + '<a class="btn btn--gold btn--sm" href="download.html">Get Sentinel v1.7.0</a></div>';
+         return;
+       }
+       button.disabled = true;
+diff --git a/download.html b/download.html
+index 29468cb..6cef5bd 100644
+--- a/download.html
++++ b/download.html
+@@ -49,20 +49,20 @@
+ </header>
+ 
+ <main>
+-<div class="prelaunch" role="status"><b>Preview.</b> Sentinel hasn&rsquo;t launched yet, so accounts, scanning and downloads aren&rsquo;t available here. Everything else is the real product: the verdicts on this page come from Sentinel&rsquo;s own engine.</div>
++<div class="prelaunch" role="status"><b>Website preview.</b> Accounts and website scanning aren&rsquo;t available here. <a href="https://github.com/zzilinct/Sentinel/releases/tag/v1.7.0">Download Sentinel v1.7.0</a> to use the app. The example verdicts on this page come from Sentinel&rsquo;s own engine.</div>
+   <section class="page-head">
+     <div class="wrap">
+       <span class="kicker" data-reveal>Download</span>
+       <h1 data-split>Sentinel for <span class="serif italic gold-text" data-os-label>your computer</span></h1>
+       <p data-reveal>The web app scans links and files anywhere. The Sentinel app adds everything that runs live: on your searches, on the pages you open and on your downloads.</p>
+       <div class="hero__cta" data-reveal style="--d:.2s">
+-        <a class="btn btn--gold btn--lg" href="https://github.com/zzilinct/Sentinel/releases/latest/download/Sentinel-Setup.exe" data-installer data-releases="zzilinct/Sentinel">
++        <a class="btn btn--gold btn--lg" href="https://github.com/zzilinct/Sentinel/releases/tag/v1.7.0" data-installer data-releases="zzilinct/Sentinel" data-release-tag="v1.7.0">
+           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11m0 0 4.5-4.5M12 15l-4.5-4.5M5 20h14"/></svg>
+-          Download for Windows
++          Download Sentinel v1.7.0
+         </a>
+         <a class="btn btn--lg is-soon" role="link" aria-disabled="true" title="Not available until launch">Use in your browser <span class="arrow">&rarr;</span></a>
+       </div>
+-      <p class="hero__fine" data-reveal style="--d:.3s" data-installer-meta><span>Windows 10 &amp; 11</span><span>64-bit</span><span>Free plan included</span></p>
++      <p class="hero__fine" data-reveal style="--d:.3s" data-installer-meta><span>Version 1.7.0</span><span>Windows 10 &amp; 11, 64-bit</span><span>Choose a download on the release page</span></p>
+     </div>
+   </section>
+ 
+@@ -73,7 +73,7 @@
+         <h2 id="release-notes-title">Sentinel 1.7.0</h2>
+         <p>1.7.0 brings together the 1.6.11 to 1.6.18 updates: marks that stay out of your way and fade while you scroll, Google results and ads checked, inbox scams caught, downloads checked in the background, much less work in the background, and live scanning tested in Edge, Chrome and Firefox. 1.6.18:the browser companion puts masks on Bing and Google results again, and checks ads. If you use it, download it again below. 1.6.17:Sentinel does far less while nothing is happening: no more starting a program every few seconds to see which browsers are open, threat lists updated by their differences, and no hidden window when it starts with Windows. 1.6.16:live scanning uses less of your computer while you read a page, and the tray gains an Auto scanning switch and a clearer update line. 1.6.15:more brands protected (including Naver, Rakuten, Okta, Alibaba and Yahoo), and new signs of phishing in the address itself, measured on a live phishing feed with no legitimate site flagged. 1.6.14:Sentinel no longer ends or removes a startup program on suspicion alone; you get a notification and decide. Known malware is still stopped at once. 1.6.13:downloaded files are checked in the background so live scanning never stutters, and a warning about a download takes you straight to its Quarantine button. 1.6.12:scams in your inbox list, like fake support desks asking for gift cards or a fake USPS fee, are marked as likely scams, and real mail stays unmarked. Scan results lead with what was found. 1.6.11:live scanning's marks sit just above your browser instead of above everything, so menus, Google's apps grid and other programs cover them. They fade out while you scroll and come back exactly beside each result, Google results are checked again, and ads are checked by the shop they lead to. 1.6.10: sponsored results on Bing, Google and DuckDuckGo are now checked, since fake shops and fake customer-service numbers often buy ads. DuckDuckGo results get one mark each, beside the title. 1.6.9: marks glide with the page as you scroll, one per website. Start scanning brings your browser forward and the gold line crosses only the browser. Real mail from companies like Google and Canva is no longer flagged for its wording. New: auto scanning, plain &ldquo;what to do now&rdquo; steps on dangerous results, and an optional check of links you copy. Updates now install themselves while you are not browsing.</p>
+         <p>Check the release page for published installers and availability.</p>
+-        <div style="margin-top:22px"><a class="btn" href="https://github.com/zzilinct/Sentinel/releases">View releases <span class="arrow">&rarr;</span></a></div>
++        <div style="margin-top:22px"><a class="btn" href="https://github.com/zzilinct/Sentinel/releases/tag/v1.7.0">View v1.7.0 release <span class="arrow">&rarr;</span></a></div>
+       </div>
+     </div>
+   </section>
+@@ -148,8 +148,8 @@
+         <h3>Not on Windows yet?</h3>
+         <p>On Windows the app needs no add-on. Where the app&rsquo;s live scanning is not available, the companion add-on puts masks on search results from inside the browser. It is loaded by hand and pairs with a running Sentinel.</p>
+         <div style="margin-top:22px;display:flex;gap:10px;flex-wrap:wrap">
+-          <a class="btn" href="https://github.com/zzilinct/Sentinel/releases/latest/download/sentinel-companion.zip">Chrome, Edge &amp; Brave (.zip)</a>
+-          <a class="btn" href="https://github.com/zzilinct/Sentinel/releases/latest/download/sentinel-companion-firefox.zip">Firefox (.zip)</a>
++          <a class="btn" href="https://github.com/zzilinct/Sentinel/releases/tag/v1.7.0">Chrome, Edge &amp; Brave downloads</a>
++          <a class="btn" href="https://github.com/zzilinct/Sentinel/releases/tag/v1.7.0">Firefox downloads</a>
+         </div>
+       </div>
+     </div>
+diff --git a/index.html b/index.html
+index 0491b07..dab422e 100644
+--- a/index.html
++++ b/index.html
+@@ -51,7 +51,7 @@
+ 
+ 
+ <main>
+-<div class="prelaunch" role="status"><b>Preview.</b> Sentinel hasn&rsquo;t launched yet, so accounts, scanning and downloads aren&rsquo;t available here. Everything else is the real product: the verdicts on this page come from Sentinel&rsquo;s own engine.</div>
++<div class="prelaunch" role="status"><b>Website preview.</b> Accounts and website scanning aren&rsquo;t available here. <a href="https://github.com/zzilinct/Sentinel/releases/tag/v1.7.0">Download Sentinel v1.7.0</a> to use the app. The example verdicts on this page come from Sentinel&rsquo;s own engine.</div>
+ 
+   <!-- ================================================================ hero -->
+   <section class="hero">
+@@ -422,7 +422,7 @@
+         <div class="try__copy">
+           <span class="kicker">Try it now</span>
+           <h2 style="margin-top:16px">Got a link you&rsquo;re <span class="serif italic">not sure about?</span></h2>
+-          <p>Paste it here. No account needed: you get the known-threat lookup and the full checklist. A free account adds history and a little live scanning. Pro adds research.</p>
++          <p>Website scanning is unavailable in this preview. Download Sentinel v1.7.0 to check links in the app, or explore the example verdicts above.</p>
+           <div class="try__examples" aria-label="Examples">
+             <span class="muted">Try:</span>
+             <button type="button" class="chip-q" data-try-example="paypal-account-verify.com/login">paypal-account-verify.com</button>
+@@ -439,7 +439,7 @@
+           <div class="try__out" data-try-out aria-live="polite">
+             <div class="try__empty">
+               <div class="try__masks"><span data-glyph="scam" style="color:var(--red)"></span><span data-glyph="virus" style="color:var(--orange)"></span><span data-glyph="malware" style="color:var(--yellow)"></span></div>
+-              <p>Your result will appear here, with every reason Sentinel found.</p>
++              <p>Link scanning is available in the Sentinel app. This preview does not inspect submitted links.</p>
+             </div>
+           </div>
+         </div>
+diff --git a/manifest.webmanifest b/manifest.webmanifest
+index 23576fc..ece978b 100644
+--- a/manifest.webmanifest
++++ b/manifest.webmanifest
+@@ -2,20 +2,20 @@
+   "name": "Sentinel",
+   "short_name": "Sentinel",
+   "description": "Scam, virus and malware protection. See the danger before you click.",
+-  "id": "/app",
+-  "start_url": "/app",
+-  "scope": "/",
++  "id": "./",
++  "start_url": "index.html",
++  "scope": "./",
+   "display": "standalone",
+   "display_override": ["window-controls-overlay", "standalone"],
+   "background_color": "#0a0b0d",
+   "theme_color": "#0a0b0d",
+   "categories": ["security", "utilities", "productivity"],
+   "icons": [
+-    { "src": "/assets/img/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+-    { "src": "/assets/img/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
++    { "src": "assets/img/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
++    { "src": "assets/img/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+   ],
+   "shortcuts": [
+-    { "name": "Scan a link", "url": "/app/scan", "icons": [{ "src": "/assets/img/icon-192.png", "sizes": "192x192" }] },
+-    { "name": "Scan a file", "url": "/app/threats", "icons": [{ "src": "/assets/img/icon-192.png", "sizes": "192x192" }] }
++    { "name": "Explore the masks", "url": "index.html#masks", "icons": [{ "src": "assets/img/icon-192.png", "sizes": "192x192" }] },
++    { "name": "Get Sentinel", "url": "download.html", "icons": [{ "src": "assets/img/icon-192.png", "sizes": "192x192" }] }
+   ]
+ }
+diff --git a/pricing.html b/pricing.html
+index 406d4e7..8d5f768 100644
+--- a/pricing.html
++++ b/pricing.html
+@@ -49,7 +49,7 @@
+ </header>
+ 
+ <main>
+-<div class="prelaunch" role="status"><b>Preview.</b> Sentinel hasn&rsquo;t launched yet, so accounts, scanning and downloads aren&rsquo;t available here. Everything else is the real product: the verdicts on this page come from Sentinel&rsquo;s own engine.</div>
++<div class="prelaunch" role="status"><b>Website preview.</b> Accounts and website scanning aren&rsquo;t available here. <a href="https://github.com/zzilinct/Sentinel/releases/tag/v1.7.0">Download Sentinel v1.7.0</a> to use the app. The example verdicts on this page come from Sentinel&rsquo;s own engine.</div>
+   <section class="page-head" style="padding-bottom:50px">
+     <div class="wrap">
+       <span class="kicker" data-reveal>Pricing</span>
+diff --git a/privacy.html b/privacy.html
+index 1e0bb10..8b96361 100644
+--- a/privacy.html
++++ b/privacy.html
+@@ -47,7 +47,7 @@
+ </header>
+ 
+ <main>
+-<div class="prelaunch" role="status"><b>Preview.</b> Sentinel hasn&rsquo;t launched yet, so accounts, scanning and downloads aren&rsquo;t available here. Everything else is the real product: the verdicts on this page come from Sentinel&rsquo;s own engine.</div>
++<div class="prelaunch" role="status"><b>Website preview.</b> Accounts and website scanning aren&rsquo;t available here. <a href="https://github.com/zzilinct/Sentinel/releases/tag/v1.7.0">Download Sentinel v1.7.0</a> to use the app. The example verdicts on this page come from Sentinel&rsquo;s own engine.</div>
+   <section class="page-head" style="padding-bottom:40px">
+     <div class="wrap-narrow">
+       <span class="kicker" data-reveal>Privacy Policy</span>
+diff --git a/terms.html b/terms.html
+index 10e31f9..76de9d6 100644
+--- a/terms.html
++++ b/terms.html
+@@ -47,7 +47,7 @@
+ </header>
+ 
+ <main>
+-<div class="prelaunch" role="status"><b>Preview.</b> Sentinel hasn&rsquo;t launched yet, so accounts, scanning and downloads aren&rsquo;t available here. Everything else is the real product: the verdicts on this page come from Sentinel&rsquo;s own engine.</div>
++<div class="prelaunch" role="status"><b>Website preview.</b> Accounts and website scanning aren&rsquo;t available here. <a href="https://github.com/zzilinct/Sentinel/releases/tag/v1.7.0">Download Sentinel v1.7.0</a> to use the app. The example verdicts on this page come from Sentinel&rsquo;s own engine.</div>
+   <section class="page-head" style="padding-bottom:40px">
+     <div class="wrap-narrow">
+       <span class="kicker" data-reveal>Terms and Conditions</span>
+diff --git a/tests/site.test.cjs b/tests/site.test.cjs
+index ed4d7a5..08335c5 100644
+--- a/tests/site.test.cjs
++++ b/tests/site.test.cjs
+@@ -5,193 +5,302 @@ const path = require('node:path');
+ const vm = require('node:vm');
+ const root = path.resolve(__dirname, '..');
+ const read = name => fs.readFileSync(path.join(root, name), 'utf8');
++const RELEASE = 'https://github.com/zzilinct/Sentinel/releases/tag/v1.7.0';
++const BASES = ['https://sentinel.test/', 'https://sentinel.test/sentinel/'];
+ 
+-function context(fetch, enabled = true, href = 'https://sentinel.test/site/login.html') {
+-  const url = new URL(href);
+-  const sandbox = { window: { SENTINEL_API_ENABLED: enabled }, fetch, AbortController, setTimeout, clearTimeout, URL, URLSearchParams, location: url };
+-  vm.createContext(sandbox);
+-  vm.runInContext(read('assets/js/masks.js'), sandbox);
+-  sandbox.window.SentinelMasks = sandbox.SentinelMasks;
+-  vm.runInContext(read('assets/js/sentinel.js'), sandbox);
+-  return sandbox;
++// Model only the DOM operations used by the marketing scripts. Initialization
++// and event handlers run from the shipped files, not copies of their behavior.
++class Element {
++  constructor(dataset = {}) {
++    this.dataset = dataset;
++    this.attributes = {};
++    this.handlers = {};
++    this.nodes = new Map();
++    this.lists = new Map();
++    this.textContent = '';
++    this.style = { setProperty() {} };
++    const classes = new Set();
++    this.classList = {
++      add: (...names) => names.forEach(name => classes.add(name)),
++      remove: (...names) => names.forEach(name => classes.delete(name)),
++      contains: name => classes.has(name),
++      toggle(name, on = !classes.has(name)) { on ? classes.add(name) : classes.delete(name); return on; }
++    };
++  }
++  set innerHTML(value) {
++    this.html = value;
++    for (const [selector, attr] of [['[data-answer]', 'answer'], ['.res', 'i']]) {
++      const matches = [...value.matchAll(new RegExp(`data-${attr}="(\\d+)"`, 'g'))];
++      this.lists.set(selector, matches.map(m => new Element({ [attr]: m[1] })));
++    }
++  }
++  get innerHTML() { return this.html || ''; }
++  querySelector(selector) {
++    if (this.lists.has(selector)) return this.lists.get(selector)[0] || null;
++    if (!this.nodes.has(selector)) this.nodes.set(selector, new Element());
++    return this.nodes.get(selector);
++  }
++  querySelectorAll(selector) { return this.lists.get(selector) || []; }
++  setAttribute(key, value) { this.attributes[key] = String(value); }
++  getAttribute(key) { return this.attributes[key] ?? null; }
++  removeAttribute(key) { delete this.attributes[key]; }
++  addEventListener(name, handler) { (this.handlers[name] ||= []).push(handler); }
++  async emit(name, event = {}) { for (const handler of this.handlers[name] || []) await handler({ preventDefault() {}, ...event }); }
++  click() { return this.emit('click'); }
++  focus() { this.focused = true; }
++  appendChild(child) { this.child = child; }
+ }
+ 
+-test('preview mode never makes API requests', async () => {
+-  let calls = 0;
+-  const c = context(() => { calls++; }, false);
+-  await assert.rejects(c.window.Sentinel.api('/auth/signup', {method:'POST',body:{email:'test@example.com'}}), /coming soon/);
+-  assert.equal(calls, 0);
+-});
+-
+-test('HTML hosting fallbacks cannot count as successful API responses', async () => {
+-  const c = context(async () => new Response('<html>Home page</html>', {status:200}));
+-  await assert.rejects(c.window.Sentinel.api('/auth/login'), /could not load/);
+-});
+-
+-test('API preserves field errors, handles JSON and accepts no-content responses', async () => {
+-  const c = context(async () => new Response(JSON.stringify({error:{message:'Invalid email',code:'validation',errors:{email:'Enter an email'}}}), {status:400}));
+-  await assert.rejects(c.window.Sentinel.api('/auth/signup'), err => err.status === 400 && err.errors.email === 'Enter an email');
+-  c.fetch = async () => new Response(JSON.stringify({user:{name:'Test'}}));
+-  assert.equal((await c.window.Sentinel.api('/auth/me')).user.name, 'Test');
+-  c.fetch = async () => new Response(null, {status:204});
+-  assert.equal(await c.window.Sentinel.api('/auth/logout'), null);
+-});
+-
+-test('hung API calls are aborted and return a usable message', async () => {
+-  const c = context((url, {signal}) => new Promise((resolve, reject) => signal.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), {name:'AbortError'})))));
+-  c.setTimeout = callback => setTimeout(callback, 5);
+-  await assert.rejects(c.window.Sentinel.api('/scan'), /took too long/);
+-});
++function homepage({ noObserver = false, hero = false, game = false, reduced = false } = {}) {
++  const timers = new Map();
++  const timeouts = [];
++  const observers = [];
++  let sequence = 0;
++  let requests = 0;
++  const form = new Element();
++  form.elements = { url: { value: 'https://example.com' } };
++  const out = new Element();
++  const stage = hero ? new Element() : null;
++  const gameNode = game ? new Element() : null;
++  const cards = ['scam', 'virus', 'malware'].map((threat, index) => {
++    const card = new Element({ threat });
++    card.querySelector('h3').textContent = threat;
++    const buttons = ['yellow', 'orange', 'red'].map(sev => new Element({ sev }));
++    buttons.forEach((button, i) => button.setAttribute('aria-pressed', String(i === [2, 1, 0][index])));
++    card.lists.set('[data-sev]', buttons);
++    return card;
++  });
++  const nodes = new Map([
++    ['[data-stage]', stage], ['[data-game]', gameNode],
++    ['[data-try-form]', form], ['[data-try-out]', out]
++  ]);
++  const document = {
++    body: new Element(), activeElement: { tagName: 'BODY' }, handlers: {},
++    querySelector: selector => nodes.get(selector) || null,
++    querySelectorAll: selector => selector === '[data-trio]' ? cards : [],
++    createElement: () => new Element(),
++    addEventListener(name, handler) { (this.handlers[name] ||= []).push(handler); }
++  };
++  const sandbox = {
++    document, location: new URL(BASES[1]), navigator: { platform: 'Win32', userAgent: '' },
++    matchMedia: () => ({ matches: reduced }), scrollY: 0, innerHeight: 800,
++    requestAnimationFrame: callback => callback(), addEventListener() {},
++    setTimeout: callback => { timeouts.push(callback); return timeouts.length; },
++    setInterval: callback => { const id = ++sequence; timers.set(id, callback); return id; },
++    clearInterval: id => timers.delete(id),
++    fetch: () => { requests++; throw new Error('Unexpected request from preview'); }
++  };
++  sandbox.window = sandbox;
++  if (!noObserver) sandbox.IntersectionObserver = class {
++    constructor(callback) { this.callback = callback; observers.push(this); }
++    observe(target) { this.target = target; }
++    unobserve() {}
++    disconnect() {}
++  };
++  vm.createContext(sandbox);
++  for (const name of ['static', 'masks', 'site', 'home']) vm.runInContext(read(`assets/js/${name}.js`), sandbox);
++  return {
++    sandbox, form, out, stage, game: gameNode, cards, timers,
++    requests: () => requests,
++    async tick() { for (const callback of [...timers.values()]) callback(); await Promise.resolve(); },
++    visible(target, isIntersecting = true) {
++      observers.filter(observer => observer.target === target).forEach(observer => observer.callback([{ target, isIntersecting }], observer));
++    },
++    async flush() {
++      for (let i = 0; i < 100; i++) {
++        timeouts.splice(0).forEach(callback => callback());
++        await new Promise(resolve => setImmediate(resolve));
++        if (!timeouts.length) return;
++      }
++      throw new Error('Preview timers did not settle');
++    }
++  };
++}
+ 
+-test('verdict content is escaped and risk scores cannot inject HTML', () => {
+-  const c = context();
+-  const html = c.window.Sentinel.verdictCard({badge:'red',label:'<script>bad</script>',score:'"><img src=x>',reasons:[{text:'<b>unsafe</b>'}]});
+-  assert.ok(!html.includes('<script>'));
+-  assert.ok(!html.includes('<img'));
+-  assert.ok(html.includes('Risk score 0/100'));
+-  assert.ok(c.window.Sentinel.verdictCard({score:999}).includes('Risk score 100/100'));
+-});
++function htmlBase(file, href) {
++  const html = read(file);
++  const match = html.match(/<base href="([^"]+)"/);
++  if (!match) return new URL('.', href);
++  const base = { href: new URL(match[1], href).href };
++  const inline = html.match(/<script>([\s\S]*?)<\/script>/)[1];
++  vm.runInNewContext(inline, { document: { querySelector: () => base }, URL, location: new URL(href) });
++  return new URL(base.href, href);
++}
+ 
+-test('severity icons share the supplied logo and have distinct shapes', () => {
+-  const c = context();
+-  for (const [tone, variant] of [['yellow','normal'],['orange','angular'],['red','horned']]) {
+-    const icon = c.window.Sentinel.mask('', tone);
+-    assert.ok(icon.includes('assets/img/sentinel.png'));
+-    assert.ok(icon.includes(`data-icon-variant="${variant}"`));
+-    assert.equal(icon.includes('<path'), tone !== 'yellow');
+-  }
+-  assert.ok(c.window.Sentinel.badge('red', '<b>danger</b>').includes('&lt;b&gt;danger&lt;/b&gt;'));
+-});
++function assertLocal(value, base, siteRoot) {
++  const url = new URL(value, base);
++  assert.equal(url.origin, new URL(siteRoot).origin);
++  assert.ok(url.pathname.startsWith(new URL(siteRoot).pathname), `${value} escapes ${siteRoot}`);
++  const target = decodeURIComponent(url.pathname.slice(new URL(siteRoot).pathname.length)) || 'index.html';
++  assert.ok(fs.existsSync(path.join(root, target)), `Missing ${target} from ${base}`);
++  if (url.hash && target.endsWith('.html')) assert.ok(read(target).includes(`id="${decodeURIComponent(url.hash.slice(1))}"`), `Missing fragment ${value}`);
++}
+ 
+-test('all local HTML links, fragments and asset references resolve', () => {
+-  const failures = [];
+-  for (const file of fs.readdirSync(root).filter(f => f.endsWith('.html'))) {
++test('all HTML links, fragments and assets resolve at root and under /sentinel/', () => {
++  for (const siteRoot of BASES) for (const file of fs.readdirSync(root).filter(f => f.endsWith('.html'))) {
+     const html = read(file);
+     const ids = [...html.matchAll(/\bid="([^"]+)"/g)].map(m => m[1]);
+     assert.equal(new Set(ids).size, ids.length, `Duplicate IDs in ${file}`);
++    const base = htmlBase(file, new URL(file, siteRoot).href);
+     for (const [, value] of html.matchAll(/\b(?:href|src)="([^"]+)"/g)) {
+-      if (/^(?:https?:|mailto:|data:)/.test(value)) continue;
+-      const url = new URL(value, `https://test.invalid/${file}`);
+-      const target = url.pathname.slice(1) || 'index.html';
+-      if (!fs.existsSync(path.join(root, target))) { failures.push(`${file}: ${value}`); continue; }
+-      if (url.hash && target.endsWith('.html') && !read(target).includes(`id="${decodeURIComponent(url.hash.slice(1))}"`)) failures.push(`${file}: ${value}`);
++      if (/^(?:https?:|mailto:|data:)/.test(value) || value === '/sentinel/') continue;
++      assertLocal(value, base, siteRoot);
+     }
+   }
+-  assert.deepEqual(failures, []);
+ });
+ 
+-test('every script parses, including inline scripts', () => {
+-  for (const file of fs.readdirSync(path.join(root, 'assets/js'))) new vm.Script(read(`assets/js/${file}`), {filename:file});
+-  for (const file of fs.readdirSync(root).filter(f => f.endsWith('.html'))) {
+-    for (const [, script] of read(file).matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)) new vm.Script(script, {filename:file});
++test('nested 404s load assets and recover to the actual site home', () => {
++  for (const siteRoot of BASES) for (const missing of ['missing/page', 'missing/deeper/page/']) {
++    const base = htmlBase('404.html', new URL(missing, siteRoot).href);
++    assert.equal(base.href, siteRoot);
++    for (const [, value] of read('404.html').matchAll(/\b(?:href|src)="([^"]+)"/g)) {
++      if (/^https?:/.test(value) || value === '/sentinel/') continue;
++      assertLocal(value, base, siteRoot);
++    }
+   }
+ });
+ 
+-test('pricing has four distinct plans with the requested monthly prices', () => {
+-  const cards = [...read('index.html').matchAll(/<article class="plan[^\"]*"[\s\S]*?<\/article>/g)].map(m=>m[0]);
+-  assert.equal(cards.length, 4);
+-  for (const [name, price] of [['Free','0'], ['Pro','15'], ['Max','40'], ['Ultimate','100']]) {
+-    const card = cards.find(c => c.includes(`class="plan__name">${name}<`));
+-    assert.ok(card?.includes(`<b>$${price}</b>`), name);
++test('font imports and font-face URLs stay within each deployment', () => {
++  for (const siteRoot of BASES) {
++    const cssUrl = new URL('assets/css/sentinel.css', siteRoot);
++    const imported = read('assets/css/sentinel.css').match(/@import url\('([^']+)'\)/)[1];
++    assertLocal(imported, cssUrl, siteRoot);
++    const fontCss = new URL(imported, cssUrl);
++    for (const [, font] of read('assets/fonts/fonts.css').matchAll(/src: url\('([^']+)'\)/g)) assertLocal(font, fontCss, siteRoot);
+   }
+-  assert.ok(cards[3].includes('Everything in Max'));
+-  assert.ok(cards[3].includes('500'));
+ });
+ 
+-test('sign-in ignores external or malformed return destinations', async () => {
+-  for (const next of ['https://evil.test', '//evil.test', '/\\evil.test', 'javascript:alert(1)', '/other.html', 'app.html']) {
+-    const c = context(undefined, true, `https://sentinel.test/site/login.html?next=${encodeURIComponent(next)}`);
+-    c.location = { href: c.location.href, search: c.location.search };
+-    let submit;
+-    const nodes = new Map();
+-    const node = id => {
+-      if (!nodes.has(id)) nodes.set(id, {textContent:'Sign in',disabled:false,hidden:true,insertAdjacentHTML(){}, reportValidity(){return true;},addEventListener(type, callback){if (type === 'submit') submit = callback;}});
+-      return nodes.get(id);
+-    };
+-    c.document = {getElementById:node,querySelectorAll:()=>[]};
+-    c.FormData = class {entries(){return [['email','test@example.com'],['password','testpassword1']];}};
+-    c.window.Sentinel.api = async route => route === '/auth/config' ? {googleEnabled:false} : {};
+-    c.window.Sentinel.pairExtension = async () => false;
+-    vm.runInContext(read('assets/js/auth.js'), c);
+-    c.window.Auth.init('login');
+-    await submit({preventDefault(){}});
+-    assert.equal(new URL(c.location.href, 'https://sentinel.test/site/login.html').href, 'https://sentinel.test/site/app.html', next);
++test('manifest launch, scope, icons and shortcuts resolve inside the static site', () => {
++  const manifest = JSON.parse(read('manifest.webmanifest'));
++  for (const siteRoot of BASES) {
++    const base = new URL('manifest.webmanifest', siteRoot);
++    assert.equal(new URL(manifest.scope, base).href, siteRoot);
++    assert.equal(new URL(manifest.id, base).href, siteRoot);
++    assertLocal(manifest.start_url, base, siteRoot);
++    for (const icon of manifest.icons) assertLocal(icon.src, base, siteRoot);
++    for (const shortcut of manifest.shortcuts) {
++      assertLocal(shortcut.url, base, siteRoot);
++      for (const icon of shortcut.icons) assertLocal(icon.src, base, siteRoot);
++    }
+   }
+ });
+ 
+-function severityPreview() {
+-  const timers = new Map();
+-  const events = {};
+-  let sequence = 0;
+-  const button = tone => ({
+-    dataset: tone ? {sev:tone} : {}, attributes:{}, handlers:{},
+-    setAttribute(key, value) {this.attributes[key] = value;},
+-    addEventListener(name, handler) {this.handlers[name] = handler;},
+-    click() {this.handlers.click();}
+-  });
+-  const cards = ['Scam','Virus','Malware'].map((name, index) => ({
+-    dataset:{severity:['red','orange','yellow'][index]},
+-    buttons:['yellow','orange','red'].map(button),
+-    style:{setProperty(){}},
+-    querySelector(){return {textContent:name};},
+-    querySelectorAll(selector){return selector === '[data-sev]' ? this.buttons : [];},
+-    append(control){this.control = control;}
+-  }));
+-  const document = {
+-    hidden:false,
+-    querySelector(){return null;},
+-    querySelectorAll(selector){return selector === '[data-trio]' ? cards : [];},
+-    createElement(){return button();},
+-    addEventListener(name, handler){(events[name] ||= []).push(handler);}
+-  };
+-  const sandbox = {
+-    document, window:{SentinelMasks:{paint(){}}},
+-    matchMedia:()=>({matches:false}), navigator:{platform:'Win32',userAgent:''},
+-    addEventListener:document.addEventListener,
+-    setInterval(callback){const id = ++sequence; timers.set(id, callback); return id;},
+-    clearInterval(id){timers.delete(id);}, clearTimeout(){},
+-  };
+-  vm.runInNewContext(read('assets/js/site.js'), sandbox);
+-  return {cards, timers, document, events, tick(){[...timers.values()].forEach(callback=>callback());}};
+-}
++test('preview submissions give an available next step without API calls or self redirects', async () => {
++  const preview = homepage();
++  await preview.form.emit('submit');
++  assert.equal(preview.requests(), 0);
++  assert.match(preview.out.innerHTML, /isn&rsquo;t available/);
++  assert.match(preview.out.innerHTML, /v1\.7\.0/);
++  assert.match(preview.out.innerHTML, /href="download.html"/);
++  assert.doesNotMatch(preview.out.innerHTML, /#try|live site/);
++});
+ 
+-test('severity cycles wrap, pause, resume and restart from the selected stage', () => {
+-  const preview = severityPreview();
++test('without IntersectionObserver, hero, game, cards and link form still initialize', async () => {
++  const preview = homepage({ noObserver: true, hero: true, game: true, reduced: true });
++  await preview.flush();
++  assert.ok(preview.stage.classList.contains('is-in'));
++  assert.match(preview.game.querySelector('[data-game-stage]').innerHTML, /data-answer/);
++  assert.ok(preview.cards.every(card => card.child.handlers.click.length === 1));
++  await preview.form.emit('submit');
++  assert.match(preview.out.innerHTML, /href="download.html"/);
++  assert.equal(preview.requests(), 0);
++});
++
++test('severity cycles wrap, pause and resume, and selecting a stage stops cycling', async () => {
++  const preview = homepage();
+   const card = preview.cards[0];
++  const buttons = card.querySelectorAll('[data-sev]');
++  const selected = () => buttons.find(button => button.getAttribute('aria-pressed') === 'true').dataset.sev;
++  preview.visible(card);
++  assert.equal(preview.timers.size, 1);
++  for (const severity of ['yellow', 'orange', 'red']) { await preview.tick(); assert.equal(selected(), severity); }
++  await card.child.click();
+   assert.equal(preview.timers.size, 0);
+-  card.buttons[0].click();
+-  assert.equal(card.dataset.severity, 'yellow');
+-  assert.equal(card.control.textContent, 'Pause cycle');
+-  for (const expected of ['orange','red','yellow']) {
+-    preview.tick();
+-    assert.equal(card.dataset.severity, expected);
+-    assert.equal(card.buttons.filter(b=>b.attributes['aria-pressed']==='true').length, 1);
+-  }
+-  card.control.click();
+-  preview.tick();
+-  assert.equal(card.dataset.severity, 'yellow');
++  preview.visible(card, false);
++  preview.visible(card);
++  assert.equal(preview.timers.size, 0, 'A user pause must survive leaving and reentering the viewport');
++  await card.child.click();
++  await preview.tick();
++  assert.equal(selected(), 'yellow');
++  await buttons[1].click();
++  assert.equal(selected(), 'orange');
+   assert.equal(preview.timers.size, 0);
+-  card.control.click();
+-  preview.tick();
+-  assert.equal(card.dataset.severity, 'orange');
+-  card.buttons[2].click();
+-  assert.equal(preview.timers.size, 1);
+-  preview.tick();
+-  assert.equal(card.dataset.severity, 'yellow');
++  await preview.flush();
++  assert.match(card.querySelector('[data-example]').innerHTML, /netflix-account-update/);
+ });
+ 
+-test('each card cycles independently and hidden pages pause all active cycles', () => {
+-  const preview = severityPreview();
+-  preview.cards[0].buttons[0].click();
+-  preview.cards[1].buttons[2].click();
+-  preview.tick();
+-  assert.deepEqual(preview.cards.map(c=>c.dataset.severity), ['orange','yellow','yellow']);
+-  preview.cards[0].control.click();
++test('cards cycle independently, stop offscreen and respect reduced motion', async () => {
++  const preview = homepage();
++  const [first, second] = preview.cards;
++  preview.visible(first);
++  preview.visible(second);
++  assert.equal(preview.timers.size, 2);
++  preview.visible(first, false);
+   assert.equal(preview.timers.size, 1);
+-  preview.tick();
+-  assert.deepEqual(preview.cards.map(c=>c.dataset.severity), ['orange','orange','yellow']);
+-  preview.document.hidden = true;
+-  preview.events.visibilitychange.forEach(callback=>callback());
+-  assert.equal(preview.timers.size, 0);
+-  assert.equal(preview.cards[1].control.textContent, 'Resume cycle');
++  await preview.tick();
++  assert.equal(first.querySelectorAll('[data-sev]')[2].getAttribute('aria-pressed'), 'true');
++  assert.equal(second.querySelectorAll('[data-sev]')[2].getAttribute('aria-pressed'), 'true');
++  const reduced = homepage({ reduced: true });
++  reduced.cards.forEach(card => reduced.visible(card));
++  assert.equal(reduced.timers.size, 0);
++});
++
++test('mask examples escape verdict text from the baked data', async () => {
++  const preview = homepage();
++  preview.sandbox.SENTINEL_DEMO.masks.scam.yellow.context = '<img src=x onerror=alert(1)>';
++  await preview.cards[0].querySelectorAll('[data-sev]')[0].click();
++  const html = preview.cards[0].querySelector('[data-example]').innerHTML;
++  assert.ok(html.includes('&lt;img'));
++  assert.ok(!html.includes('<img'));
++});
++
++test('all release links point to the requested v1.7.0 release', () => {
++  const links = [...read('download.html').matchAll(/href="(https:\/\/github.com\/zzilinct\/Sentinel\/releases[^\"]*)"/g)];
++  assert.ok(links.length >= 4);
++  for (const [, link] of links) assert.equal(link, RELEASE);
++  assert.match(read('download.html'), /data-release-tag="v1\.7\.0"/);
++});
++
++test('release metadata is pinned and never disables the release page on failures', async () => {
++  for (const outcome of ['asset', 'no-assets', 'rate-limit', 'offline']) {
++    const button = new Element({ releases: 'zzilinct/Sentinel', releaseTag: 'v1.7.0' });
++    button.setAttribute('href', RELEASE);
++    const meta = new Element();
++    meta.innerHTML = 'Version 1.7.0';
++    const requests = [];
++    vm.runInNewContext(read('assets/js/download.js'), {
++      document: { querySelector: selector => selector === '[data-installer]' ? button : meta },
++      fetch: async url => {
++        requests.push(url);
++        if (outcome === 'offline') throw new Error('Offline');
++        return { ok: outcome !== 'rate-limit', json: async () => ({ tag_name: 'v1.7.0', assets: outcome === 'asset' ? [{ name: 'Sentinel-Setup.exe', size: 10485760 }] : [] }) };
++      }
++    });
++    await new Promise(resolve => setImmediate(resolve));
++    assert.deepEqual(requests, ['https://api.github.com/repos/zzilinct/Sentinel/releases/tags/v1.7.0']);
++    assert.equal(button.getAttribute('href'), RELEASE);
++    assert.notEqual(button.getAttribute('aria-disabled'), 'true');
++    assert.match(meta.innerHTML, /1\.7\.0/);
++    if (outcome === 'asset') assert.match(meta.innerHTML, /10 MB/);
++  }
++});
++
++test('every script parses, including inline scripts', () => {
++  for (const file of fs.readdirSync(path.join(root, 'assets/js'))) new vm.Script(read(`assets/js/${file}`), { filename: file });
++  for (const file of fs.readdirSync(root).filter(f => f.endsWith('.html'))) {
++    for (const [, script] of read(file).matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)) new vm.Script(script, { filename: file });
++  }
++});
++
++test('pricing has four distinct plans with the requested monthly prices', () => {
++  for (const file of ['index.html', 'pricing.html']) {
++    const cards = [...read(file).matchAll(/<article class="plan[^\"]*"[\s\S]*?<\/article>/g)].map(m => m[0]);
++    assert.equal(cards.length, 4);
++    for (const [name, price] of [['Free', '0'], ['Pro', '15'], ['Max', '40'], ['Ultimate', '100']]) {
++      const card = cards.find(c => c.includes(`class="plan__name">${name}<`));
++      assert.ok(card?.includes(`<b>$${price}</b>`), `${file}: ${name}`);
++    }
++    assert.ok(cards[3].includes('Everything in Max'));
++    assert.ok(cards[3].includes('500'));
++  }
+ });
