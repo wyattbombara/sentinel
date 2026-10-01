@@ -6,6 +6,7 @@
 <meta name="referrer" content="strict-origin-when-cross-origin">
 <script src="assets/js/static.js"></script>
 <script src="assets/js/boot.js"></script>
+<script src="assets/js/intro.js" defer></script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0a0b0d" media="(prefers-color-scheme: dark)">
 <meta name="theme-color" content="#f6f4ef" media="(prefers-color-scheme: light)">
@@ -132,6 +133,7 @@
         <li><b>Public threat lists</b> (OpenPhish, URLhaus by abuse.ch, Phishing.Database) are downloaded to Sentinel. Nothing about you is sent to them.</li>
         <li><b>Domain registries (RDAP)</b> and <b>the site being scanned</b> receive requests from Sentinel&rsquo;s servers during research scans, so they see that Sentinel looked, not who asked.</li>
         <li><b>Google Safe Browsing</b>, only if the operator configures it, receives the web address being checked.</li>
+        <li><b>Have I Been Pwned</b> is asked whether a new password has appeared in a known data breach. It receives only the first 5 characters of a scrambled form (hash) of the password, which matches hundreds of passwords, never the password itself.</li>
         <li><b>Resend</b> delivers account emails (confirmation, password reset) on the hosted service and receives your email address and the message.</li>
         <li><b>Google</b>, only if you choose &ldquo;Continue with Google&rdquo;, tells Sentinel your email, name and profile picture, and whether the address is verified.</li>
         <li><b>GitHub</b> hosts the public website and the app downloads. Like any web host, it logs the IP addresses of visitors under its own privacy policy. The download page also asks GitHub&rsquo;s API for the latest release version.</li>
