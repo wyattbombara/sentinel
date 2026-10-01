@@ -1,0 +1,14 @@
+﻿Publication prepared against wyattbombara/sentinel main at 2ee2a0102cbf8d1462b73865896e78ef0a406821.
+
+The site snapshot preserves the newer remote themes, fonts, security headers and legal pages,
+merges the six reviewed fixes, and pins downloads to Sentinel v1.7.0.
+14 regression tests pass, including CSP compatibility for nested 404 recovery.
+
+Nothing has been committed, pushed or deployed by this restricted session.
+Local .git metadata is read-only; GitHub write tools require approval while approval is disabled.
+
+To publish, run publish.ps1 from an unrestricted PowerShell terminal using your existing Git credentials.
+The script creates a fresh checkout, refuses to overwrite an existing directory, checks the remote
+commit is still the reviewed one, copies only the 14 changed files, reruns tests, and pushes to main.
+The push starts the existing GitHub Pages workflow. Its deployment result must then be checked at
+https://github.com/wyattbombara/sentinel/actions

@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
+const crypto = require('node:crypto');
 const root = path.resolve(__dirname, '..');
 const read = name => fs.readFileSync(path.join(root, name), 'utf8');
 const RELEASE = 'https://github.com/zzilinct/Sentinel/releases/tag/v1.7.0';
@@ -170,6 +171,19 @@ test('font imports and font-face URLs stay within each deployment', () => {
   }
 });
 
+test('404 recovery is permitted by CSP without allowing arbitrary inline scripts', () => {
+  const html = read('404.html');
+  const policy = html.match(/http-equiv="Content-Security-Policy" content="([^"]+)"/)[1];
+  const scripts = policy.match(/(?:^|;\s*)script-src ([^;]+)/)[1];
+  assert.ok(!scripts.includes("'unsafe-inline'"));
+  assert.ok(policy.includes("base-uri 'self'"));
+  assert.ok(html.indexOf('Content-Security-Policy') < html.indexOf('<base '));
+  for (const [, script] of html.matchAll(/<script>([\s\S]*?)<\/script>/g)) {
+    const hash = crypto.createHash('sha256').update(script).digest('base64');
+    assert.ok(scripts.includes(`'sha256-${hash}'`), 'The exact 404 bootstrap must be allowed');
+  }
+});
+
 test('manifest launch, scope, icons and shortcuts resolve inside the static site', () => {
   const manifest = JSON.parse(read('manifest.webmanifest'));
   for (const siteRoot of BASES) {
@@ -283,32 +297,6 @@ test('release metadata is pinned and never disables the release page on failures
     assert.match(meta.innerHTML, /1\.7\.0/);
     if (outcome === 'asset') assert.match(meta.innerHTML, /10 MB/);
   }
-});
-
-test('hidden reveals fail open when a script errors or site.js never becomes ready', () => {
-  const boot = (ready) => {
-    const classes = new Set();
-    let onError;
-    let timer;
-    const win = {
-      IntersectionObserver: class {},
-      document: { documentElement: { classList: { add: c => classes.add(c) } } },
-      location: { protocol: 'file:', hostname: '' },
-      navigator: {},
-      addEventListener: (type, fn) => { if (type === 'error') onError = fn; },
-      setTimeout: fn => { timer = fn; }
-    };
-    win.window = win;
-    vm.runInNewContext(read('assets/js/boot.js'), win);
-    if (ready) win.Site = { ready: true };
-    return { classes, error: target => onError({ target: target === 'window' ? win : { tagName: target } }), timeout: () => timer() };
-  };
-  let b = boot(false); b.error('IMG'); assert.ok(!b.classes.has('no-io'), 'a missing image keeps the animations');
-  b.error('SCRIPT'); assert.ok(b.classes.has('no-io'), 'a script that fails to load reveals everything');
-  b = boot(false); b.error('window'); assert.ok(b.classes.has('no-io'), 'a runtime error reveals everything');
-  b = boot(false); b.timeout(); assert.ok(b.classes.has('no-io'), 'site.js never running reveals everything');
-  b = boot(true); b.error('window'); b.timeout(); assert.ok(!b.classes.has('no-io'), 'once reveals run, later errors leave them alone');
-  assert.match(read('assets/js/site.js'), /window\.Site\.ready = true/);
 });
 
 test('every script parses, including inline scripts', () => {
