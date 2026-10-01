@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
+const crypto = require('node:crypto');
 const root = path.resolve(__dirname, '..');
 const read = name => fs.readFileSync(path.join(root, name), 'utf8');
 const RELEASE = 'https://github.com/zzilinct/Sentinel/releases/tag/v1.7.0';
@@ -167,6 +168,19 @@ test('font imports and font-face URLs stay within each deployment', () => {
     assertLocal(imported, cssUrl, siteRoot);
     const fontCss = new URL(imported, cssUrl);
     for (const [, font] of read('assets/fonts/fonts.css').matchAll(/src: url\('([^']+)'\)/g)) assertLocal(font, fontCss, siteRoot);
+  }
+});
+
+test('404 recovery is permitted by CSP without allowing arbitrary inline scripts', () => {
+  const html = read('404.html');
+  const policy = html.match(/http-equiv="Content-Security-Policy" content="([^"]+)"/)[1];
+  const scripts = policy.match(/(?:^|;\s*)script-src ([^;]+)/)[1];
+  assert.ok(!scripts.includes("'unsafe-inline'"));
+  assert.ok(policy.includes("base-uri 'self'"));
+  assert.ok(html.indexOf('Content-Security-Policy') < html.indexOf('<base '));
+  for (const [, script] of html.matchAll(/<script>([\s\S]*?)<\/script>/g)) {
+    const hash = crypto.createHash('sha256').update(script).digest('base64');
+    assert.ok(scripts.includes(`'sha256-${hash}'`), 'The exact 404 bootstrap must be allowed');
   }
 });
 
