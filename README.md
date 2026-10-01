@@ -6,16 +6,18 @@
 
 # Sentinel website
 
-Static product preview. There is currently no API, account service, payment integration or downloadable extension in this repository.
+Static product preview. This export has no API, account service or payment integration. Website submissions do not scan links; the homepage examples use verdicts baked into `assets/js/static.js`.
 
 To preview locally, run `python -m http.server 8765 --bind 127.0.0.1` from this directory, then open `http://127.0.0.1:8765/index.html`.
 
 Run the dependency-free regression checks with `node --test tests/site.test.cjs` (Node 18 or later).
 
-The original supplied logo is `assets/img/sentinel.png`. Navigation, browser icons, the manifest and every threat illustration use it. `assets/js/masks.js` adds severity cues: a normal yellow shield, angular orange details, and red horns. These variants are shared by the marketing demos, threat cards and dashboard verdicts.
+If the environment blocks the test runner from spawning a child process, run `node tests/site.test.cjs` instead. Both commands execute the same tests. Checks cover root and `/sentinel/` deployments, nested 404 recovery, fonts, manifest targets, preview submissions, homepage compatibility, severity controls, release metadata failures, script parsing and pricing.
 
-`assets/js/config.js` keeps online features disabled until a backend is implemented. See [SERVER-REPORT.md](SERVER-REPORT.md) for the existing API expectations and outstanding work. Keep this disabled until the API is ready; toggling it does not create a backend.
+The download page and preview notices link to [Sentinel v1.7.0](https://github.com/zzilinct/Sentinel/releases/tag/v1.7.0). `assets/js/download.js` optionally retrieves metadata for that tag; missing assets, rate limiting or offline requests leave the release-page link available.
 
-Pricing: Free $0, Pro $15/month, Max $40/month, Ultimate $100/month. Ultimate includes every Max feature, uncapped live scanning hours, 500 researched link scans per week and 500 virus/malware scans per week. These are planned offerings, not enforced subscriptions.
+Fonts and manifest URLs are relative to their files, so they work at the domain root and under the GitHub Pages `/sentinel/` path. The manifest opens the preview homepage and links to existing marketing pages. `404.html` sets a site-root base before loading assets, with a fallback for root-hosted local previews.
 
-For a future extension release, publish a ZIP in `downloads/`, then set `available`, `version` and a site-relative `download` URL in `downloads/latest.json`. The page only enables downloading after the archive responds successfully and is not an HTML fallback page.
+`assets/js/masks.js` provides shared SVG brand and threat glyphs. `site.js` supplies the navigation, reveals and an `IntersectionObserver` fallback; `home.js` uses that fallback for the hero and game as well as severity cards.
+
+Pricing shown in the preview: Free $0, Pro $15/month, Max $40/month and Ultimate $100/month. This static website does not sell subscriptions or enforce quotas. [SERVER-REPORT.md](SERVER-REPORT.md) is an older backend-gap report, not a description of a running service in this export.
