@@ -1,0 +1,10 @@
+diff a/.publish-review/site/index.html b/.publish-review/site/index.html	(rejected hunks)
+@@ -51,7 +51,7 @@
+ 
+ 
+ <main>
+-<div class="prelaunch" role="status"><b>Preview.</b> Sentinel hasn&rsquo;t launched yet, so accounts, scanning and downloads aren&rsquo;t available here. Everything else is the real product: the verdicts on this page come from Sentinel&rsquo;s own engine.</div>
++<div class="prelaunch" role="status"><b>Website preview.</b> Accounts and website scanning aren&rsquo;t available here. <a href="https://github.com/zzilinct/Sentinel/releases/tag/v1.7.0">Download Sentinel v1.7.0</a> to use the app. The example verdicts on this page come from Sentinel&rsquo;s own engine.</div>
+ 
+   <!-- ================================================================ hero -->
+   <section class="hero">
