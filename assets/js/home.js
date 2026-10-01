@@ -180,7 +180,7 @@
     replay.addEventListener('click', () => play(current));
 
     let started = false;
-    new IntersectionObserver((entries, obs) => {
+    new Site.Observer((entries, obs) => {
       if (!entries[0].isIntersecting) return;
       obs.disconnect();
       stage.classList.add('is-in');
@@ -424,7 +424,7 @@
 
     // Number keys answer while the game is on screen.
     let gameVisible = false;
-    new IntersectionObserver((e) => { gameVisible = e[0].isIntersecting; }, { threshold: 0.15 }).observe(game);
+    new Site.Observer((e) => { gameVisible = e[0].isIntersecting; }, { threshold: 0.15 }).observe(game);
     document.addEventListener('keydown', (ev) => {
       if (!gameVisible || answered || ev.altKey || ev.ctrlKey || ev.metaKey) return;
       if (/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName)) return;
@@ -451,9 +451,8 @@
       const url = input.value.trim();
       if (!url) return;
       if (window.SENTINEL_STATIC) {
-        const site = window.SENTINEL_STATIC.origin;
-        out.innerHTML = `<div class="try__empty"><p>This preview can&rsquo;t reach the scanner. Check this link on the live site. No account needed.</p>`
-          + `<a class="btn btn--gold btn--sm" href="${site}/#try">Open ${esc(site.replace(/^https?:\/\//, ''))}</a></div>`;
+        out.innerHTML = '<div class="try__empty"><p>Link scanning isn&rsquo;t available on this website preview. Download Sentinel v1.7.0 to check links in the app.</p>'
+          + '<a class="btn btn--gold btn--sm" href="download.html">Get Sentinel v1.7.0</a></div>';
         return;
       }
       button.disabled = true;
