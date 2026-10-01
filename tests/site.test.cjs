@@ -285,6 +285,32 @@ test('release metadata is pinned and never disables the release page on failures
   }
 });
 
+test('hidden reveals fail open when a script errors or site.js never becomes ready', () => {
+  const boot = (ready) => {
+    const classes = new Set();
+    let onError;
+    let timer;
+    const win = {
+      IntersectionObserver: class {},
+      document: { documentElement: { classList: { add: c => classes.add(c) } } },
+      location: { protocol: 'file:', hostname: '' },
+      navigator: {},
+      addEventListener: (type, fn) => { if (type === 'error') onError = fn; },
+      setTimeout: fn => { timer = fn; }
+    };
+    win.window = win;
+    vm.runInNewContext(read('assets/js/boot.js'), win);
+    if (ready) win.Site = { ready: true };
+    return { classes, error: target => onError({ target: target === 'window' ? win : { tagName: target } }), timeout: () => timer() };
+  };
+  let b = boot(false); b.error('IMG'); assert.ok(!b.classes.has('no-io'), 'a missing image keeps the animations');
+  b.error('SCRIPT'); assert.ok(b.classes.has('no-io'), 'a script that fails to load reveals everything');
+  b = boot(false); b.error('window'); assert.ok(b.classes.has('no-io'), 'a runtime error reveals everything');
+  b = boot(false); b.timeout(); assert.ok(b.classes.has('no-io'), 'site.js never running reveals everything');
+  b = boot(true); b.error('window'); b.timeout(); assert.ok(!b.classes.has('no-io'), 'once reveals run, later errors leave them alone');
+  assert.match(read('assets/js/site.js'), /window\.Site\.ready = true/);
+});
+
 test('every script parses, including inline scripts', () => {
   for (const file of fs.readdirSync(path.join(root, 'assets/js'))) new vm.Script(read(`assets/js/${file}`), { filename: file });
   for (const file of fs.readdirSync(root).filter(f => f.endsWith('.html'))) {
