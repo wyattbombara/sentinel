@@ -13,8 +13,8 @@
 <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="assets/img/icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="preload" href="assets/fonts/atkinson-hyperlegible-next-normal-400-700.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="preload" href="assets/fonts/bricolage-grotesque-normal-400-800.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="assets/fonts/geist-normal-300-700.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="assets/fonts/instrument-serif-normal-400.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="assets/css/sentinel.css">
 <link rel="stylesheet" href="assets/css/interactive.css">
 <meta property="og:site_name" content="Sentinel">
@@ -60,8 +60,7 @@
 <div class="prelaunch" role="status"><b>Preview.</b> Sentinel hasn&rsquo;t launched yet, so accounts, scanning and downloads aren&rsquo;t available here. Everything else is the real product: the verdicts on this page come from Sentinel&rsquo;s own engine.</div>
   <section class="page-head">
     <div class="wrap">
-      <span class="kicker" data-reveal>Download</span>
-      <h1 data-split>Sentinel for <span class="serif italic gold-text" data-os-label>your computer</span></h1>
+      <h1 data-split>Sentinel for <em data-os-label>your computer</em></h1>
       <p data-reveal>The web app scans links and files anywhere. The Sentinel app adds everything that runs live: on your searches, on the pages you open and on your downloads.</p>
       <div class="hero__cta" data-reveal style="--d:.2s">
         <a class="btn btn--gold btn--lg" href="https://github.com/zzilinct/Sentinel/releases/latest/download/Sentinel-Setup.exe" data-installer data-releases="zzilinct/Sentinel">
@@ -78,8 +77,15 @@
     <div class="wrap">
       <div class="tile" data-reveal>
         <div class="tile__label">Release notes</div>
-        <h2 id="release-notes-title">Sentinel 1.8.1</h2>
-        <p>Marks now move the moment your mouse wheel turns, along the same curve as the page, and positions read mid-scroll no longer throw them off the page. Sentinel reads each result&rsquo;s title and your search words to understand a site without opening it, and reads names made of real words as words, so overdrive.com is no longer mistaken for OneDrive while look-alikes such as onedrlve are still caught.</p>
+        <h2 id="release-notes-title">Sentinel 1.8.8</h2>
+        <p>A new look: editorial serif headlines, the gold gradient back on the buttons, soft raised panels and a new way for sections to arrive as you scroll. Real sites named like big companies are left alone (110 of 111, up from 106), and a site&rsquo;s front page is no longer blamed for a listed page elsewhere on it.</p>
+        <p>1.8.7: fixes from a full review of the last six updates: hidden PowerShell downloaders and phishing forms with little scripts in them are caught again, real security mail stays unmarked, marks come back after a wheel turned over something that does not scroll, and Restore keeps a backup of anything it cannot put back.</p>
+        <p>1.8.6: the file scanner leaves your real programs alone: measured on 4,500 real files from Windows and the programs installed with it, none is marked. Scripts are only treated as downloaders when they both fetch and run something, and a program or archive hiding behind a document name is still caught.</p>
+        <p>1.8.5: email scams are caught even when they have no link: callback scams (&ldquo;call this number to cancel&rdquo;), fake tech support, gift-card and wire requests from a &ldquo;boss&rdquo;, requests for your bank details or Social Security number, and toll and fine demands. On 80 real emails from real companies and 46 of today&rsquo;s scams, every scam was flagged and no real email was.</p>
+        <p>1.8.4: more phishing caught from the address alone (96.3% of today&rsquo;s phishing addresses, up from 95.0%): pages hidden behind generated folder names, throwaway site-builder pages and web hosts&rsquo; temporary addresses are now flagged. Shared Google documents are no longer marked yellow, and Sentinel is now measured against 99 real pages deep inside real sites, with no false alarms.</p>
+        <p>1.8.3: Sentinel is gentler on your PC. It only listens to your mouse while live scanning has marks on screen, never starts an update over a fullscreen game, and asks Microsoft Defender before acting on a file it cannot read. Restore now brings back Startup shortcuts and scheduled tasks too, and never overwrites a newer file.</p>
+        <p>1.8.2: marks stay on their results when you keep scrolling at the end of a page or scroll an inbox list, and a slow browser no longer throws them back mid-scroll. Accounts are safer: Google sign-in finishes only in the browser that started it, turning on two-factor asks for your password, and community reports need confirmed, week-old accounts. Light mode is readable everywhere, every page links the Privacy Policy, Terms and Refund Policy, and the browser companion (1.4.1) matches the website.</p>
+        <p>1.8.1: marks move the moment your mouse wheel turns the moment your mouse wheel turns, along the same curve as the page, and positions read mid-scroll no longer throw them off the page. Sentinel reads each result&rsquo;s title and your search words to understand a site without opening it, and reads names made of real words as words, so overdrive.com is no longer mistaken for OneDrive while look-alikes such as onedrlve are still caught.</p>
         <p>The website has light and dark themes, new fonts made for reading, a Refund Policy, and clearer Privacy and Terms. Other browser extensions can no longer read your account through the site.</p>
         <p>1.7.0 brought together the 1.6.11 to 1.6.18 updates: Google results and ads checked, inbox scams caught, downloads checked in the background, much less work in the background, and live scanning tested in Edge, Chrome and Firefox.</p>
         <p>Check the release page for published installers and availability.</p>
@@ -91,8 +97,7 @@
   <section class="section--tight">
     <div class="wrap">
       <div class="section__head section__head--center" style="margin-bottom:48px">
-        <span class="kicker" data-reveal>What the app unlocks</span>
-        <h2 data-split>Browser vs. <span class="serif italic">the app</span></h2>
+        <h2 data-split>What the app adds <em>to the browser</em></h2>
       </div>
       <div class="compare-wrap" data-reveal>
         <table class="compare">
@@ -117,14 +122,13 @@
   <section class="section--tight">
     <div class="wrap">
       <div class="section__head">
-        <span class="kicker" data-reveal>Setup</span>
-        <h2 data-split>Protected in <span class="serif italic">minutes</span></h2>
+        <h2 data-split>Set up <em>in a few minutes</em></h2>
       </div>
       <div class="pipeline is-in">
         <div class="step" data-reveal>
           <div class="step__num">01</div>
           <h3>Install Sentinel</h3>
-          <p>Run the installer. Sentinel opens, adds its mask to your system tray and starts protecting straight away. There is nothing to configure.</p>
+          <p>Run the installer. Sentinel opens and adds its mask to your system tray. Live scanning stays off until you start it in step 03.</p>
         </div>
         <div class="step" data-reveal style="--d:.08s">
           <div class="step__num">02</div>
