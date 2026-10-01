@@ -66,14 +66,21 @@ body {
 }
 
 /* Film grain + warm light - the page is never flat black. */
+/* Oversized so the slow drift never shows an edge; transform-only, so it stays on the GPU. */
 body::before {
   content: '';
   position: fixed;
-  inset: 0;
+  inset: -20vmax;
   z-index: -2;
   background:
+    radial-gradient(38vmax 28vmax at 24% 18%, rgba(212, 174, 99, .13), transparent 70%),
+    radial-gradient(34vmax 30vmax at 82% 34%, rgba(70, 110, 190, .09), transparent 70%),
+    radial-gradient(44vmax 32vmax at 50% 92%, rgba(212, 174, 99, .07), transparent 70%),
     var(--bg);
+  animation: drift 38s ease-in-out infinite alternate;
+  will-change: transform;
 }
+@keyframes drift { to { transform: translate3d(4vmax, -3vmax, 0) rotate(7deg) scale(1.06); } }
 body::after {
   content: '';
   position: fixed;
