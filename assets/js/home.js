@@ -171,7 +171,14 @@
     }
 
     chips.forEach((chip, i) => {
-      chip.addEventListener('click', () => play(chip.dataset.query));
+      chip.addEventListener('click', () => {
+        // The window turns over to the new search.
+        const win = $('.window', stage);
+        win.classList.remove('is-swapping');
+        void win.offsetWidth;
+        win.classList.add('is-swapping');
+        play(chip.dataset.query);
+      });
       chip.addEventListener('keydown', (ev) => {
         if (ev.key !== 'ArrowRight' && ev.key !== 'ArrowLeft') return;
         const next = chips[(i + (ev.key === 'ArrowRight' ? 1 : chips.length - 1)) % chips.length];
@@ -220,9 +227,8 @@
       if (focus) b.focus();
       const sev = b.dataset.sev;
       card.style.setProperty('--c', COLOR[sev]);
-      card.classList.remove('is-switching');
-      void card.offsetWidth;
-      card.classList.add('is-switching');
+      // The mask itself takes the colour: each card carries a render in every severity colour.
+      $$('[data-tint]', card).forEach((img) => img.classList.toggle('is-on', img.dataset.tint === sev));
 
       const d = await examples;
       const ex = d && d.masks[threat] && d.masks[threat][sev];
@@ -271,7 +277,8 @@
       }, 3200);
     };
     cycle.addEventListener('click', () => (timer ? stop(true) : start()));
-    card.appendChild(cycle);
+    // Beside the severity buttons, in the plate's panel when the card has one.
+    ($('.plate__info', card) || card).appendChild(cycle);
     stop();
 
     buttons.forEach((b, i) => {
@@ -523,4 +530,23 @@
     row.addEventListener('click', toggle);
     row.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); toggle(); } });
   });
+
+  /* =========================================================== manifesto */
+
+  // One line per colour, chosen by how far through the pinned section the reader has scrolled.
+  const manifesto = $('[data-manifesto]');
+  if (manifesto) {
+    const lines = $$('.manifesto__line', manifesto);
+    let queued = false;
+    const pick = () => {
+      queued = false;
+      const r = manifesto.getBoundingClientRect();
+      const p = Math.min(0.999, Math.max(0, -r.top / Math.max(1, r.height - innerHeight)));
+      const at = Math.floor(p * lines.length);
+      lines.forEach((line, i) => line.classList.toggle('is-on', i === at));
+      manifesto.dataset.on = String(at);
+    };
+    addEventListener('scroll', () => { if (!queued) { queued = true; requestAnimationFrame(pick); } }, { passive: true });
+    pick();
+  }
 })();
