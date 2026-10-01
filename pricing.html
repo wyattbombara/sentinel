@@ -58,7 +58,9 @@
 
 <main id="main">
 <div class="prelaunch" role="status"><b>Preview.</b> Sentinel hasn&rsquo;t launched yet, so accounts, scanning and downloads aren&rsquo;t available here. Everything else is the real product: the verdicts on this page come from Sentinel&rsquo;s own engine.</div>
-  <section class="page-head" style="padding-bottom:50px">
+  <!-- The three masks (scene3d.js), resting at the margins. -->
+  <canvas class="scene3d" data-scene aria-hidden="true"></canvas>
+  <section class="page-head" data-pose="page" style="padding-bottom:50px">
     <div class="wrap">
       <h1 data-split>Plans by how much <em>live scanning</em> you need</h1>
       <p data-reveal>Start free with manual scans and 15 minutes of live scanning a week. Upgrade for more time and research.</p>
@@ -67,7 +69,7 @@
 
   <section class="section--tight" style="padding-top:0">
     <div class="wrap">
-      <div class="finder" data-finder data-reveal>
+      <div class="finder" data-finder data-reveal="blur">
   <div class="finder__q">
     <span class="finder__label">Masks while you browse and read email?</span>
     <div class="seg-toggle" role="radiogroup" aria-label="Live protection">
@@ -90,7 +92,7 @@
 </div>
 
 <div class="pricing" data-pricing>
-  <article class="plan" data-plan-card="free" data-reveal>
+  <article class="plan" data-plan-card="free" data-reveal="rise">
     <div class="plan__name">Free</div>
     <div class="plan__price"><b>$0</b><span>no card</span></div>
     <p class="plan__desc">Check any link or file you&rsquo;re unsure about.</p>
@@ -105,7 +107,7 @@
     </ul>
   </article>
 
-  <article class="plan plan--featured" data-plan-card="pro" data-reveal style="--d:.08s">
+  <article class="plan plan--featured" data-plan-card="pro" data-reveal="rise" style="--d:.08s">
     <div class="plan__name">Pro</div>
     <div class="plan__price"><b>$15</b><span>/ month</span></div>
     <p class="plan__desc">Live masks while you search and read email.</p>
@@ -121,7 +123,7 @@
     </ul>
   </article>
 
-  <article class="plan" data-plan-card="max" data-reveal style="--d:.16s">
+  <article class="plan" data-plan-card="max" data-reveal="rise" style="--d:.16s">
     <div class="plan__name">Max</div>
     <div class="plan__price"><b>$40</b><span>/ month</span></div>
     <p class="plan__desc">More delicate scanning. Every email checkable.</p>
@@ -136,7 +138,7 @@
     </ul>
   </article>
 
-  <article class="plan plan--ultimate" data-plan-card="ultimate" data-reveal style="--d:.24s">
+  <article class="plan plan--ultimate" data-plan-card="ultimate" data-reveal="rise" style="--d:.24s">
     <div class="plan__name">Ultimate</div>
     <div class="plan__price"><b>$100</b><span>/ month</span></div>
     <p class="plan__desc">Everything in Max, with 96 hours of delicate scanning a week.</p>
@@ -224,5 +226,7 @@
 
 <script src="assets/js/masks.js"></script>
 <script src="assets/js/site.js"></script>
+<script src="assets/js/three.min.js" defer></script>
+<script src="assets/js/scene3d.js" defer></script>
 </body>
 </html>
