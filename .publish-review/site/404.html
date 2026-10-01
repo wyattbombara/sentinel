@@ -2,26 +2,19 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<base href="/sentinel/">
-<script>
-// Resolve every asset and recovery link from the site root, even on nested 404s.
-// Root-hosted local previews use / instead of the published GitHub Pages path.
-(() => {
-  const base = document.querySelector('base');
-  const sitePath = new URL(base.href).pathname;
-  if (location.pathname !== sitePath.slice(0, -1) && !location.pathname.startsWith(sitePath)) base.href = '/';
-})();
-</script>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; connect-src 'self' https://wyattbombara.github.io/sentinel https://api.github.com; object-src 'none'; base-uri 'none'; form-action 'self' https://wyattbombara.github.io/sentinel">
+<meta name="referrer" content="strict-origin-when-cross-origin">
 <script src="assets/js/static.js"></script>
 <script src="assets/js/boot.js"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0a0b0d">
-<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0a0b0d" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f6f4ef" media="(prefers-color-scheme: light)">
+<meta name="color-scheme" content="dark light">
 <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="assets/img/icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="preload" href="assets/fonts/geist-normal-300-700.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="preload" href="assets/fonts/instrument-serif-normal-400.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="assets/fonts/atkinson-hyperlegible-next-normal-400-700.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="assets/fonts/bricolage-grotesque-normal-400-800.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="assets/css/sentinel.css">
 <link rel="stylesheet" href="assets/css/interactive.css">
 <meta property="og:site_name" content="Sentinel">
@@ -33,6 +26,7 @@
 <meta name="robots" content="noindex">
 </head>
 <body class="has-prelaunch">
+<a class="skip-link" href="#main">Skip to content</a>
 <header class="nav" data-nav>
   <div class="wrap nav__inner">
     <a class="logo" href="index.html" aria-label="Sentinel home">
@@ -46,6 +40,10 @@
       <a href="index.html#try" data-spy="try">Try a link</a>
       <a href="pricing.html" data-spy="pricing">Pricing</a>
     </nav>
+    <button class="theme-toggle" type="button" data-theme-toggle aria-label="Change theme">
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 3.5a8.5 8.5 0 0 1 0 17Z" fill="currentColor"/></svg>
+      <span data-theme-label>Auto</span>
+    </button>
     <div class="nav__actions" data-auth-actions>
       <a class="btn btn--ghost btn--sm is-soon" role="link" aria-disabled="true" title="Not available until launch">Sign in</a>
       <a class="btn btn--gold btn--sm" href="download.html">Download</a>
@@ -56,8 +54,8 @@
   </div>
 </header>
 
-<main>
-<div class="prelaunch" role="status"><b>Website preview.</b> Accounts and website scanning aren&rsquo;t available here. <a href="https://github.com/zzilinct/Sentinel/releases/tag/v1.7.0">Download Sentinel v1.7.0</a> to use the app. The example verdicts on this page come from Sentinel&rsquo;s own engine.</div>
+<main id="main">
+<div class="prelaunch" role="status"><b>Preview.</b> Sentinel hasn&rsquo;t launched yet, so accounts, scanning and downloads aren&rsquo;t available here. Everything else is the real product: the verdicts on this page come from Sentinel&rsquo;s own engine.</div>
   <section class="page-head" style="min-height:78vh;display:grid;place-items:center">
     <div class="wrap-narrow">
       <div class="mask-card__glyph" style="--c:var(--gold-400);margin:0 auto 20px;color:var(--gold-400)" data-glyph="scam" data-reveal="scale"></div>
