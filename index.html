@@ -492,7 +492,7 @@
         <div class="try__copy">
           <span class="kicker"><b class="kicker__n">IX</b>Check it yourself</span>
           <h2>Got a link you&rsquo;re <em>not sure about?</em></h2>
-          <p>Paste it here. No account needed: you get the known-threat lookup and the full checklist. A free account adds history and a little live scanning. Pro adds research.</p>
+          <p>Paste it here. No account needed. Fast gives you the known-threat lookup and the full checklist in about a second; Delicate also researches the site, and you can try it three times a day. A free account adds history and a little live scanning; Pro adds delicate scans every week.</p>
           <div class="try__examples" aria-label="Examples">
             <span class="muted">Try:</span>
             <button type="button" class="chip-q" data-try-example="paypal-account-verify.com/login">paypal-account-verify.com</button>
@@ -506,6 +506,22 @@
             <input name="url" type="text" inputmode="url" autocomplete="off" spellcheck="false" placeholder="Paste a link" aria-label="Link to check" required maxlength="2000">
             <button class="btn btn--gold" type="submit">Check</button>
           </form>
+          <div class="try__opts">
+            <label class="try__model"><span>Model</span>
+              <select data-try-model aria-label="Model">
+                <option value="argus" selected>Argus, the newest</option>
+                <option disabled>Cerberus, planned</option>
+                <option disabled>Talos, planned</option>
+                <option disabled>Heimdall, planned</option>
+                <option disabled>Lokapalas, planned</option>
+              </select>
+            </label>
+            <div class="try__seg" role="group" aria-label="Scan mode">
+              <button type="button" class="is-on" data-try-mode="fast" aria-pressed="true">Fast</button>
+              <button type="button" data-try-mode="delicate" aria-pressed="false">Delicate</button>
+            </div>
+            <span class="try__mode-note" data-try-note>Threat lists, the full checklist and known scams, in about a second.</span>
+          </div>
           <div class="try__out" data-try-out aria-live="polite">
             <div class="try__empty">
               <div class="try__masks"><span data-glyph="scam" style="color:var(--red)"></span><span data-glyph="virus" style="color:var(--orange)"></span><span data-glyph="malware" style="color:var(--yellow)"></span></div>
@@ -566,7 +582,7 @@
     <p class="plan__desc">Check any link or file you&rsquo;re unsure about.</p>
     <a class="btn btn--block is-soon"  data-plan-cta="free" role="link" aria-disabled="true" title="Not available until launch">Create free account</a>
     <ul class="plan__list">
-      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 5 5 9-10"/></svg><span><b>10</b> link scans a week</span></li>
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 5 5 9-10"/></svg><span><b>10</b> fast link scans a week</span></li>
       <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 5 5 9-10"/></svg><span><b>5</b> virus &amp; malware scans a week</span></li>
       <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 5 5 9-10"/></svg><span>Known-threat lookup + full checklist</span></li>
       <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 5 5 9-10"/></svg><span>Scam mask on link scans</span></li>
@@ -584,12 +600,12 @@
     <ul class="plan__list">
       <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 5 5 9-10"/></svg><span><b>24 hours</b> of fast live scanning a week</span></li>
       <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 5 5 9-10"/></svg><span><b>4 hours</b> of delicate live scanning a week, every result researched</span></li>
-      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 5 5 9-10"/></svg><span><b>40</b> researched link scans a week</span></li>
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 5 5 9-10"/></svg><span><b>200</b> fast and <b>40</b> delicate link scans a week</span></li>
       <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 5 5 9-10"/></svg><span><b>40</b> virus &amp; malware scans a week</span></li>
       <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 5 5 9-10"/></svg><span>All three masks: scam, virus, malware</span></li>
       <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 5 5 9-10"/></svg><span>Inbox marks in Gmail &amp; Outlook on the web</span></li>
       <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 5 5 9-10"/></svg><span>Download protection in the app</span></li>
-      <li class="plan__model"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3 4 6v6c0 4.5 3.4 8.2 8 9 4.6-.8 8-4.5 8-9V6z"/><path d="M9 11h2M13 11h2"/></svg><span>On the newest three models: <b>18 hours</b> fast, <b>3 hours</b> delicate, <b>30</b> scam and <b>30</b> virus &amp; malware link scans a week</span></li>
+      <li class="plan__model"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3 4 6v6c0 4.5 3.4 8.2 8 9 4.6-.8 8-4.5 8-9V6z"/><path d="M9 11h2M13 11h2"/></svg><span>On the newest three models: <b>18 hours</b> fast and <b>3 hours</b> delicate live scanning, <b>150</b> fast and <b>30</b> delicate link scans, and <b>30</b> virus &amp; malware scans a week</span></li>
     </ul>
   </article>
 
@@ -601,7 +617,7 @@
     <ul class="plan__list">
       <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 5 5 9-10"/></svg><span><b>Unlimited</b> fast live scanning</span></li>
       <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 5 5 9-10"/></svg><span><b>24 hours</b> of delicate live scanning a week, every result researched</span></li>
-      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 5 5 9-10"/></svg><span><b>100</b> researched link scans a week</span></li>
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 5 5 9-10"/></svg><span><b>1,000</b> fast and <b>100</b> delicate link scans a week</span></li>
       <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 5 5 9-10"/></svg><span><b>100</b> virus &amp; malware scans a week</span></li>
       <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 5 5 9-10"/></svg><span>Paste any email in for a full scan</span></li>
       <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 5 5 9-10"/></svg><span>Everything in Pro</span></li>
@@ -617,7 +633,7 @@
     <ul class="plan__list">
       <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 5 5 9-10"/></svg><span><b>Unlimited</b> fast live scanning</span></li>
       <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 5 5 9-10"/></svg><span><b>96 hours</b> of delicate live scanning a week, every result researched</span></li>
-      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 5 5 9-10"/></svg><span><b>500</b> researched link scans a week</span></li>
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 5 5 9-10"/></svg><span><b>Unlimited</b> fast and <b>500</b> delicate link scans a week</span></li>
       <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 5 5 9-10"/></svg><span><b>500</b> virus &amp; malware scans a week</span></li>
       <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 5 5 9-10"/></svg><span>Full email scans &amp; download protection</span></li>
       <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 5 5 9-10"/></svg><span>Everything in Max</span></li>
@@ -757,6 +773,7 @@
 </footer>
 
 <script src="assets/js/masks.js"></script>
+<script src="assets/js/binary.js"></script>
 <script src="assets/js/site.js"></script>
 <script src="assets/js/home.js"></script>
 <script src="assets/js/anime.min.js" defer></script>
