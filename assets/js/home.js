@@ -82,7 +82,7 @@
       v.why.innerHTML = reasons.length
         ? reasons.map((r) => `<li>${esc(r.text)}</li>`).join('')
         : `<li>${result.discounted ? 'No record of this site in any threat feed, so scores were lowered' : 'Nothing in the checklist raised a concern'}</li>`;
-      v.checks.textContent = `${result.checks.total} checks · ${result.checks.failed + result.checks.warned} flagged`;
+      v.checks.textContent = `${result.checks.total - (result.checks.skipped || 0)} checks · ${result.checks.failed + result.checks.warned} flagged`;
       v.source.textContent = result.known ? 'Known threat' : 'Checklist';
       verdictFloat.classList.add('is-on');
       verdictFloat.classList.remove('is-updating');
@@ -522,6 +522,9 @@
         delicate: 'Also researches the site: its age, certificate, redirects and page content. Three a day without an account.' };
     if (here) {
       if (note) note.textContent = NOTES.fast;
+      // Delicate would run the same fast check here, so the choice is not offered.
+      const seg = $('.try__seg');
+      if (seg) seg.hidden = true;
       const lede = $('[data-try-lede]');
       if (lede) lede.textContent = 'Paste it here. Sentinel’s address checks run right in your browser, so the link is never sent anywhere. The Sentinel app adds the public threat lists, research into the site and live scanning.';
     }
@@ -537,7 +540,7 @@
       const s = document.createElement('script');
       s.src = 'assets/js/engine.js';
       s.onload = () => (window.SentinelEngine ? resolve(window.SentinelEngine) : s.onerror());
-      s.onerror = () => { engineLoad = null; s.remove(); reject(new Error('Couldn’t load the checker. Try again in a moment.')); };
+      s.onerror = () => { engineLoad = null; s.remove(); reject(new Error('Could not load the checker. Try again in a moment.')); };
       document.head.appendChild(s);
     }));
 
@@ -546,7 +549,7 @@
       const url = input.value.trim();
       if (!url) return;
       button.disabled = true;
-      button.innerHTML = '<span class="spinner"></span>';
+      button.innerHTML = '<span class="spinner" role="img" aria-label="Checking"></span>';
       out.setAttribute('aria-busy', 'true');
       const dig = !here && tryMode === 'delicate' && window.SentinelBinary ? window.SentinelBinary.dig(out) : null;
       try {
@@ -563,13 +566,13 @@
         });
         const body = await res.json().catch(() => ({}));
         // As in ui.js api(): a server fault never shows its own text, only a plain sentence.
-        if (!res.ok) throw new Error((res.status < 500 && body.error && body.error.message) || 'Couldn’t check that link right now.');
+        if (!res.ok) throw new Error((res.status < 500 && body.error && body.error.message) || 'Could not check that link right now.');
         if (dig) await dig.finish();
         renderTry(body.verdict);
       } catch (err) {
         if (dig) dig.stop();
         // A failed connection surfaces as a TypeError whose text is the browser's, not ours.
-        out.innerHTML = `<div class="try__empty"><p>${esc(err.name === 'Error' ? err.message : 'Couldn’t check that link right now.')}</p>${here ? '' : '<a class="btn btn--gold btn--sm" href="/signup">Create free account</a>'}</div>`;
+        out.innerHTML = `<div class="try__empty"><p>${esc(err.name === 'Error' ? err.message : 'Could not check that link right now.')}</p>${here ? '' : '<a class="btn btn--gold btn--sm" href="/signup">Create free account</a>'}</div>`;
       } finally {
         button.disabled = false;
         button.textContent = 'Check';
@@ -580,18 +583,25 @@
     function renderTry(v) {
       const worst = flagged(v)[0];
       const badge = worst ? v.threats[worst].badge : null;
+      // Checked here, nothing was looked up in a threat list: a clean result is not "No threats found", and not green.
+      const unlisted = v.local && !badge;
+      const title = badge ? esc(v.overall.label) : unlisted ? 'No warning signs in the address' : 'No threats found';
+      // What was left out is not counted as checked.
+      const ran = v.checks.total - (v.checks.skipped || 0);
       out.innerHTML = `
-        <div class="try__result" style="--c:${colorOf(badge)}">
+        <div class="try__result" style="--c:${unlisted ? 'var(--muted)' : colorOf(badge)}">
           <div class="try__head">
             <div class="try__icon">${Masks.svg(worst || 'scam')}</div>
-            <div style="min-width:0"><h3>${badge ? esc(v.overall.label) : 'No threats found'}</h3><p>${esc(v.host)}</p></div>
+            <div style="min-width:0"><h3>${title}</h3><p>${esc(v.host)}</p></div>
           </div>
+          ${unlisted ? '<p class="try__caveat">Threat lists were not checked here. The Sentinel app checks them.</p>' : ''}
+          ${v.partial ? '<p class="try__caveat">Some checks did not run: the word list could not load. Check again in a moment for the full result.</p>' : ''}
           <div class="try__threats">
-            ${ORDER.map((t) => `<div class="try__threat" style="--c:${colorOf(v.threats[t].badge)}">${Masks.svg(t)}<b>${esc(v.threats[t].label)}</b><span>${NAMES[t]} &middot; ${v.threats[t].score}/100</span></div>`).join('')}
+            ${ORDER.map((t) => `<div class="try__threat" style="--c:${unlisted ? 'var(--muted)' : colorOf(v.threats[t].badge)}">${Masks.svg(t)}<b>${esc(v.threats[t].label)}</b><span>${NAMES[t]} &middot; ${v.threats[t].score}/100</span></div>`).join('')}
           </div>
           <ul class="try__why">${v.reasons.length ? v.reasons.map((r) => `<li>${esc(r.text)}</li>`).join('') : `<li>${v.discounted ? 'No record in any threat feed and nothing in the checklist raised a concern' : 'Nothing in the checklist raised a concern'}</li>`}</ul>
           <div class="try__foot">
-            <span>${v.known ? 'Known threat' : `${v.checks.total} checks &middot; ${v.checks.failed + v.checks.warned} flagged &middot; ${v.local ? 'checked in your browser' : v.delicate ? 'site researched' : 'no research'}`}</span>
+            <span>${v.known ? 'Known threat' : `${ran} checks &middot; ${v.checks.failed + v.checks.warned} flagged &middot; ${v.local ? 'checked in your browser' : v.delicate ? 'site researched' : 'no research'}`}</span>
             ${v.local
     ? '<a href="download.html">Threat lists and research come with the app &rarr;</a>'
     : `<a href="/signup?next=${encodeURIComponent(`/app/scan?url=${encodeURIComponent(v.url)}`)}">Research it with Sentinel Pro &rarr;</a>`}

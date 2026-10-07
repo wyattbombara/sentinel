@@ -37,7 +37,7 @@
         location.replace(`/login?next=${encodeURIComponent(location.pathname + location.search)}`);
         return;
       }
-      view.innerHTML = `<div class="banner banner--error"><b>Sentinel couldn’t load.</b>&nbsp;${esc(err.message)}</div>`;
+      view.innerHTML = `<div class="banner banner--error"><b>Sentinel could not load.</b>&nbsp;${esc(err.message)}</div>`;
       return;
     }
 
@@ -170,7 +170,8 @@
     '/app/security': ['security', securityView],
     '/app/assistants': ['assistants', assistantsView],
     '/app/sites': ['sites', sitesView],
-    '/app/checkup': ['checkup', checkupView]
+    '/app/checkup': ['checkup', checkupView],
+    '/app/recover': ['recover', recoverView]
   };
 
   function render() {
@@ -193,7 +194,7 @@
     fn(el, new URLSearchParams(location.search));
     // Every view draws its forms synchronously before it waits on anything, so what was typed can go back in now.
     restoreDrafts();
-    document.title = `${{ home: 'Overview', scan: 'Link scan', threats: 'Virus & malware', email: 'Email scan', history: 'History', protection: 'Live protection', plan: 'Plan & usage', security: 'Security', assistants: 'AI assistants', sites: 'Site rules', checkup: 'Browser checkup' }[name]} · Sentinel`;
+    document.title = `${{ home: 'Overview', scan: 'Link scan', threats: 'Virus & malware', email: 'Email scan', history: 'History', protection: 'Live protection', plan: 'Plan & usage', security: 'Security', assistants: 'AI assistants', sites: 'Site rules', checkup: 'Browser checkup', recover: 'Recovery guide' }[name]} · Sentinel`;
   }
 
   /** Render a verdict with its checklist tools and follow-up actions. */
@@ -226,7 +227,7 @@
     ['Overview', '/app', 'home'], ['Link scan', '/app/scan', 'scan'], ['Virus & malware scan', '/app/threats', 'threats'],
     ['Email scan', '/app/email', 'email'], ['History', '/app/history', 'history'], ['Site rules', '/app/sites', 'sites'], ['Browser checkup', '/app/checkup', 'checkup'],
     ['Live protection', '/app/protection', 'protection'], ['Plan & usage', '/app/plan', 'plan'], ['Security', '/app/security', 'security'],
-    ['AI assistants', '/app/assistants', 'assistants']
+    ['AI assistants', '/app/assistants', 'assistants'], ['Recovery guide', '/app/recover', 'recover']
   ];
   const looksLikeUrl = (s) => /^(https?:\/\/)?([a-z0-9-]+\.)+[a-z]{2,}(:\d+)?(\/\S*)?$/i.test(s.trim()) || /^https?:\/\/\S+$/i.test(s.trim());
 
@@ -344,7 +345,7 @@
     $('[data-resend]', bar).addEventListener('click', (ev) => busy(ev.currentTarget, 'Sending', async () => {
       try {
         const { verification } = await api('/auth/verify/resend', { method: 'POST', body: {} });
-        toast({ sent: 'Verification email sent.', already: 'This address is already confirmed.', failed: 'The email could not be sent right now. Try again later.', unavailable: 'This Sentinel can’t send email.' }[verification] || 'Done.', verification === 'sent' ? 'success' : 'info');
+        toast({ sent: 'Verification email sent.', already: 'This address is already confirmed.', failed: 'The email could not be sent right now. Try again later.', unavailable: 'This Sentinel cannot send email.' }[verification] || 'Done.', verification === 'sent' ? 'success' : 'info');
       } catch (err) { toast(err.message, 'error'); }
     }));
     return bar;
@@ -616,7 +617,7 @@
       return `<div class="banner"><div><b>${esc(err.message)}</b> Choose a model above, or <a href="/app/plan" class="u-gold">compare plans</a>.</div></div>`;
     }
     if (err.code === 'weekly_limit_reached') {
-      return `<div class="banner"><div><b>You’ve used this week’s scans.</b> Your ${esc(err.extra.plan)} plan resets ${until(err.extra.resetsAt)}. <a href="/app/plan" class="u-gold">See plans</a></div></div>`;
+      return `<div class="banner"><div><b>You have used this week's scans.</b> Your ${esc(err.extra.plan)} plan resets ${until(err.extra.resetsAt)}. <a href="/app/plan" class="u-gold">See plans</a></div></div>`;
     }
     if (err.code === 'plan_required') {
       return `<div class="banner"><div><b>${esc(err.message)}</b> <a href="/app/plan" class="u-gold">Compare plans</a></div></div>`;
@@ -634,7 +635,7 @@
     const greet = hour < 5 ? 'Up late' : hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
 
     el.innerHTML = `
-      ${title(`${greet}, ${esc(u.firstName)}`,'Paste anything you’re unsure about. Sentinel will tell you exactly what it finds.')}
+      ${title(`${greet}, ${esc(u.firstName)}`,'Paste anything you are unsure about. Sentinel will tell you exactly what it finds.')}
       <form class="scanbox" data-quick>
         ${ICON.search}
         <input name="url" type="text" inputmode="url" autocomplete="off" spellcheck="false" placeholder="Paste a link from a message, email or search result" aria-label="Link to scan">
@@ -755,7 +756,7 @@
         </span>
       </div>
       ${qrPicker()}
-      <div data-qr-out></div>
+      <div data-qr-out aria-live="polite"></div>
       <div data-out></div>`;
 
     mountModels(el);
@@ -771,34 +772,36 @@
       $('[data-left]', el).textContent = scanLeftText(mode);
     }));
 
-    // A QR code: read here, explained, and a link in it scanned like a typed one.
+    // A QR code: read here, explained, and a link in it checked with a fast scan, whatever mode is chosen: a few test
+    // pictures must not quietly use up delicate scans. A delicate look is one press of Scan link away.
     const qrOut = $('[data-qr-out]', el);
-    let fromQr = false;
     wireQr(el, async (text) => {
-      const info = await explainQr(qrOut, text);
+      const info = await explainQr(qrOut, text, { focus: true });
       if (!info || !info.url) return;
-      fromQr = true;
       form.url.value = info.url;
-      form.requestSubmit();
+      await scanLink(info.url, true);
     });
 
-    form.addEventListener('submit', async (ev) => {
+    form.addEventListener('submit', (ev) => {
       ev.preventDefault();
       const url = form.url.value.trim();
-      if (!url) return;
+      if (url) scanLink(url, false);
+    });
+
+    async function scanLink(url, fromQr) {
       // A link typed after a QR code is a scan of its own: the code's card goes.
       if (!fromQr) qrOut.innerHTML = '';
-      fromQr = false;
       // Remembered in the history entry, so Back and reload show the address without spending another scan.
       history.replaceState({ scanned: url }, '', `/app/scan?url=${encodeURIComponent(url)}`);
       const button = $('button[type=submit]', form);
-      const deep = mode === 'delicate';
+      const runMode = fromQr ? 'fast' : mode;
+      const deep = runMode === 'delicate';
       out.innerHTML = stagesView(deep);
       const stop = runStages(out, deep);
       // A delicate scan digs: the result area runs with binary while the site is researched (binary.js).
       const dig = deep && window.SentinelBinary ? window.SentinelBinary.dig(out, { colors: ['gold'] }) : null;
       try {
-        const data = await busy(button, 'Scanning', () => api('/scan/link', { method: 'POST', body: { url, mode } }));
+        const data = await busy(button, fromQr ? 'Checking the link in the code' : 'Scanning', () => api('/scan/link', { method: 'POST', body: { url, mode: runMode } }));
         stop();
         applyUsage(data.usage);
         if (dig) await dig.finish(data.verdict);
@@ -809,7 +812,7 @@
         if (dig) dig.stop();
         out.innerHTML = friendlyError(err);
       }
-    });
+    }
 
     const preset = params.get('url');
     if (preset) {
@@ -830,18 +833,21 @@
         <span class="qr-in__icon">${ICON.qr}</span>
         <div class="qr-in__text"><b>Got a QR code?</b><span>Choose, drop or paste (Ctrl+V) a picture of it${camera ? ', or hold it up to the camera' : ''}. It is read on this device and not uploaded.</span></div>
         <span class="qr-in__btns">
-          <label class="btn btn--sm">Choose a picture<input type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/bmp" data-qr-file hidden></label>
+          <button class="btn btn--sm" type="button" data-qr-pick>Choose a picture</button><input type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/bmp" data-qr-file hidden>
           ${camera ? '<button class="btn btn--sm" type="button" data-qr-cam>Use the camera</button>' : ''}
         </span>
         <div class="qr-cam" data-qr-camview hidden><video muted playsinline aria-label="Camera view"></video><p class="muted">Hold the QR code up to the camera. It is read here, and the camera turns off as soon as a code is found.</p></div>
       </div>`;
   }
 
-  /** The text of a QR code in an image or a video frame, or null. Tried at two sizes: large first, then smaller. */
-  function qrFrom(src, w, h) {
+  /**
+   * The text of a QR code in an image or a video frame, or null. A picture is tried at two sizes, large first, then
+   * smaller; a camera frame once, at most 640 wide, since it is looked at a few times a second on the page's own thread.
+   */
+  function qrFrom(src, w, h, sides) {
     if (!window.SentinelQR || !w || !h) return null;
     const big = Math.max(w, h);
-    for (const side of [Math.min(1600, Math.max(big, 480)), 800]) {
+    for (const side of sides || [Math.min(1600, Math.max(big, 480)), 800]) {
       const s = side / big;
       const cw = Math.max(1, Math.round(w * s));
       const ch = Math.max(1, Math.round(h * s));
@@ -859,8 +865,22 @@
   }
 
   async function qrFromFile(file) {
+    await qrEngine();
     const bmp = await createImageBitmap(file);
     try { return qrFrom(bmp, bmp.width, bmp.height); } finally { bmp.close(); }
+  }
+
+  // The reader (qr.js) loads the first time a picture or the camera is read, not with every page of the app.
+  let qrLoad = null;
+  function qrEngine() {
+    if (window.SentinelQR) return Promise.resolve(window.SentinelQR);
+    return qrLoad || (qrLoad = new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = '/assets/js/qr.js';
+      s.onload = () => (window.SentinelQR ? resolve(window.SentinelQR) : s.onerror());
+      s.onerror = () => { qrLoad = null; s.remove(); reject(new Error('The QR code reader could not load. Try again in a moment.')); };
+      document.head.appendChild(s);
+    }));
   }
 
   /** What a QR code does, as a card in the shape of a verdict, with what to do when it is more than a link. */
@@ -880,10 +900,14 @@
       </article>`;
   }
 
-  async function explainQr(out, text) {
+  // Only the code's text is sent, and never a secret in it (a sign-in token, a Wi-Fi password): see SentinelQR.redact.
+  async function explainQr(out, text, { focus = false } = {}) {
     try {
-      const { qr } = await api('/scan/qr', { method: 'POST', body: { text } });
+      const { qr } = await api('/scan/qr', { method: 'POST', body: { text: window.SentinelQR.redact(text) } });
       out.innerHTML = qrCard(qr);
+      // Read from a picture, the result is somewhere new on the page: keyboard and screen reader users are taken to it.
+      const heading = focus && $('h2', out);
+      if (heading) { heading.tabIndex = -1; heading.focus({ preventScroll: false }); }
       return qr;
     } catch (err) {
       out.innerHTML = friendlyError(err);
@@ -904,11 +928,13 @@
         const text = await qrFromFile(file);
         if (text == null) toast('No QR code was found in that picture. Try a closer, sharper picture with the whole code in it.', 'info', 6000);
         else await onText(text);
-      } catch {
-        toast('That picture could not be read.', 'error');
+      } catch (err) {
+        toast(qrLoad === null && !window.SentinelQR ? 'The QR code reader could not load. Try again in a moment.' : 'That picture could not be read.', 'error');
       } finally { reading = false; }
     };
     const input = $('[data-qr-file]', box);
+    // A real button, so the keyboard reaches it; the file input itself stays out of the way.
+    $('[data-qr-pick]', box).addEventListener('click', () => input.click());
     input.addEventListener('change', () => { fromFile(input.files[0]); input.value = ''; });
     ['dragenter', 'dragover'].forEach((t) => el.addEventListener(t, (ev) => {
       if (ev.dataTransfer && [...ev.dataTransfer.types].includes('Files')) { ev.preventDefault(); box.classList.add('is-over'); }
@@ -921,10 +947,14 @@
       ev.preventDefault();
       fromFile(file);
     });
-    // Ctrl+V with a picture on the clipboard (a Snipping Tool capture, say). Pasted text is left to the page.
+    // Ctrl+V with a picture on the clipboard (a Snipping Tool capture, say). Pasted text is left to the page: a copy
+    // from Excel or Word carries a picture of itself too, and pasted into a text box it is the text that is meant.
     const onPaste = (ev) => {
       if (!el.isConnected) { document.removeEventListener('paste', onPaste); return; }
-      const item = [...(ev.clipboardData ? ev.clipboardData.items : [])].find((i) => i.kind === 'file' && /^image\//.test(i.type));
+      const items = [...(ev.clipboardData ? ev.clipboardData.items : [])];
+      const typing = ev.target && ev.target.closest && ev.target.closest('input, textarea, [contenteditable]');
+      if (typing && items.some((i) => i.kind === 'string' && i.type === 'text/plain')) return;
+      const item = items.find((i) => i.kind === 'file' && /^image\//.test(i.type));
       if (item) { ev.preventDefault(); fromFile(item.getAsFile()); }
     };
     document.addEventListener('paste', onPaste);
@@ -947,6 +977,7 @@
     };
     camBtn.addEventListener('click', async () => {
       if (stream) { stop(); return; }
+      try { await qrEngine(); } catch (err) { toast(err.message, 'error'); return; }
       try {
         stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
       } catch {
@@ -961,7 +992,7 @@
       timer = setInterval(async () => {
         if (!el.isConnected) { stop(); return; }
         if (reading || !video.videoWidth) return;
-        const text = qrFrom(video, video.videoWidth, video.videoHeight);
+        const text = qrFrom(video, video.videoWidth, video.videoHeight, [Math.min(640, Math.max(video.videoWidth, video.videoHeight))]);
         if (text == null) return;
         stop();
         reading = true;
@@ -1113,7 +1144,7 @@
       return;
     }
     el.innerHTML = `
-      ${title('Email scan', 'Paste what you see in your inbox. Every link and the sender’s domain go through the full link pipeline too.',
+      ${title('Email scan', 'Paste what you see in your inbox. Every link and the sender\'s domain go through the full link pipeline too.',
         '<div class="segmented" role="tablist"><button role="tab" data-emode="fields" aria-selected="true">Fill in</button><button role="tab" data-emode="paste" aria-selected="false">Paste whole email</button><button role="tab" data-emode="shot" aria-selected="false">Screenshot</button></div>')}
       ${modelSlot(true)}
       <div class="panel" data-shot hidden>
@@ -1155,7 +1186,8 @@
       $$('[data-emode]', el).forEach((x) => x.setAttribute('aria-selected', String(x === b)));
       pasteBox.hidden = b.dataset.emode !== 'paste';
       shotBox.hidden = b.dataset.emode !== 'shot';
-      if (!pasteBox.hidden) $('textarea', pasteBox).focus();
+      // Pasting a whole email starts another one: a code from an earlier screenshot does not go with it.
+      if (!pasteBox.hidden) { forgetShotQr(); $('textarea', pasteBox).focus(); }
     }));
     const fill = (raw) => {
       const m = parseEmail(raw);
@@ -1181,6 +1213,7 @@
     // hidden in the code is checked with the email's other links, and a sign-in code is called what it is.
     const qrSlot = $('[data-email-qr]', el);
     let shotQr = [];
+    function forgetShotQr() { shotQr = []; qrSlot.innerHTML = ''; }
     let reading = false;
     const readShot = async (file) => {
       if (!file || reading) return;
@@ -1189,11 +1222,10 @@
       const url = URL.createObjectURL(file);
       $('img', preview).src = url;
       preview.hidden = false;
-      shotQr = [];
-      qrSlot.innerHTML = '';
+      forgetShotQr();
       try {
         const code = await qrFromFile(file);
-        if (code != null && await explainQr(qrSlot, code)) shotQr = [code];
+        if (code != null && await explainQr(qrSlot, code)) shotQr = [window.SentinelQR.redact(code)];
       } catch { /* no code read: the text is still read below */ }
       if (!desktop || !desktop.readScreenshot) { shotStatus.textContent = 'Reading screenshots needs the Sentinel app for Windows.'; return; }
       reading = true;
@@ -1246,6 +1278,8 @@
         stop();
         applyUsage(data.usage);
         showVerdict(out, data.verdict);
+        // Scanned with this email. The next email typed in here is another one, without this screenshot's code.
+        forgetShotQr();
       } catch (err) { stop(); out.innerHTML = friendlyError(err); }
     });
   }
@@ -1399,7 +1433,7 @@
             <button class="btn btn--sm" data-remove="${esc(o.host)}">Remove</button>
           </li>`).join('')}</ul>` : `<div class="empty"><p>${empty}</p></div>`}`;
       };
-      section($('[data-allow]', el), 'allow', 'Trusted', 'No trusted sites yet. Use “Trust this site” on any scan result, or add one above.');
+      section($('[data-allow]', el), 'allow', 'Trusted', 'No trusted sites yet. Use "Trust this site" on any scan result, or add one above.');
       section($('[data-block]', el), 'block', 'Blocked', 'No blocked sites. Block a site to give it a red mask everywhere, for you.');
       $$('[data-remove]', el).forEach((b) => b.addEventListener('click', () => busy(b, 'Removing', async () => {
         try {
@@ -1427,15 +1461,39 @@
 
   /* ====================================================== browser checkup */
 
+  /* ====================================================== recovery guide */
+
+  // The same guide as the website's /recover page (recover.js), inside the app, so the sidebar stays. What is ticked is
+  // kept in this browser only, shared with that page.
+  function recoverView(el) {
+    el.innerHTML = `
+      ${title('I think I&rsquo;ve been scammed', 'Take a breath. Tick what happened, and Sentinel puts what to do in order, most urgent first. Nothing you tick leaves this computer.')}
+      <div class="recover" data-recover>
+        <fieldset class="recover__what">
+          <legend><h2>What happened?</h2><span>Tick everything that fits.</span></legend>
+          <div class="recover__picks" data-recover-picks></div>
+        </fieldset>
+        <div class="recover__bar">
+          <label class="recover__country"><span>Where you live</span><select data-recover-country></select></label>
+          <div class="recover__actions">
+            <button type="button" class="btn btn--gold btn--sm" data-recover-print>Print</button>
+            <button type="button" class="btn btn--ghost btn--sm" data-recover-reset>Start over</button>
+          </div>
+        </div>
+        <div class="recover__plan" data-recover-plan></div>
+      </div>`;
+    window.SentinelRecover.mount($('[data-recover]', el), location.search);
+  }
+
   function checkupView(el) {
     const can = Boolean(desktop && desktop.browserCheckup);
     el.innerHTML = `${title('Browser checkup', 'The add-ons, notification permissions, search engine and startup pages of every browser on this computer, looked over for the ones scammers and unwanted software plant.')}
       ${can ? `<div class="panel">
-        <div class="panel__head"><div><h2>Check my browsers</h2><p>Sentinel reads each browser’s settings on this computer and changes nothing. History, passwords and cookies are never opened, and sites are checked by their address without being opened.</p></div>
+        <div class="panel__head"><div><h2>What the checkup reads</h2><p>Sentinel reads each browser's settings on this computer and changes nothing. History, passwords and cookies are never opened, and sites are checked by their address without being opened.</p></div>
           <button class="btn btn--gold" data-run-checkup>Run checkup</button></div>
       </div>
-      <div data-checkup-out></div>`
-    : lockedCard({ tag: 'Unlocked by the Sentinel app', heading: 'Download Sentinel to check your browsers', body: 'The checkup reads your browsers’ settings on your computer, so it runs in the Sentinel app for Windows.', actions: `<a class="btn btn--gold" href="/download">${ICON.download}Download Sentinel</a>` })}`;
+      <div data-checkup-out aria-live="polite"></div>`
+    : lockedCard({ tag: 'Unlocked by the Sentinel app', heading: 'Download Sentinel to check your browsers', body: 'The checkup reads your browsers\' settings on your computer, so it runs in the Sentinel app for Windows.', actions: `<a class="btn btn--gold" href="/download">${ICON.download}Download Sentinel</a>` })}`;
     if (!can) return;
     const out = $('[data-checkup-out]', el);
     const run = $('[data-run-checkup]', el);
@@ -1459,8 +1517,25 @@
       <span class="list__main"><b>${esc(name)}</b><span>${esc(detail)}</span>${help ? `<span class="muted">${help}</span>` : ''}</span>
     </li>`;
     const siteRow = (where, s, plain) => row(siteBadge(s) ? Masks.svg('scam') : ICON.globe, siteBadge(s), where,
-      !s.verdict ? (r.sitesChecked ? plain : `${plain}. Not checked: Sentinel could not reach its scanner just now.`)
+      !s.verdict ? (r.sitesChecked ? plain : `${plain}. Not checked: ${r.sitesWhy || 'Sentinel could not reach its scanner just now.'}`)
         : s.verdict.badge ? `${s.verdict.label}${s.verdict.reason ? `: ${s.verdict.reason}` : ''}` : `${plain}. No issues found.`);
+
+    // How a flagged add-on is removed depends on how it got there: the Remove button alone does not undo a policy, a
+    // shortcut that loads it, or a program that adds it back.
+    const removal = (b, a, short) => {
+      if (a.source === 'policy') {
+        return `A policy on this computer installed it, so ${esc(short)} will not let you remove it. ${b.policies ? 'The policy is listed under "Policies on this computer" above.' : `${esc(short)} lists its policies at ${copy(b.places.policies)}`} Only this computer's administrator can remove a policy. If nobody set one up on purpose, ask someone you trust to help.`;
+      }
+      if (a.source === 'commandline') {
+        return `The shortcut you open ${esc(short)} with loads it, so removing it in the browser does not last. Right-click that shortcut (on the taskbar, right-click the icon, then right-click ${esc(short)}), choose Properties, and in Target delete the part that begins with --load-extension. Do the same for each shortcut, then close ${esc(short)} and open it again.`;
+      }
+      if (a.source === 'unpacked') {
+        return /^about:/.test(b.places.addons) ? `It is gone the next time ${esc(short)} starts.`
+          : `Open ${copy(b.places.addons)} and turn on Developer mode. A Remove button then shows on it.`;
+      }
+      const at = `If you did not add it yourself, remove it at ${copy(b.places.addons)}`;
+      return a.source === 'external' ? `${at} If it comes back, uninstall the program that added it, in Settings &gt; Apps.` : at;
+    };
 
     let flagged = 0;
     const panels = r.browsers.map((b) => {
@@ -1476,8 +1551,8 @@
         return `${b.profiles.length > 1 ? `<h3 class="u-mt">${esc(p.name)}</h3>` : ''}
           <h4 class="u-mt">Add-ons</h4>
           ${addons.length ? `<ul class="list">${addons.map((a) => row(a.badge ? Masks.svg('malware') : ICON.check, a.badge, `${a.name}${a.enabled ? '' : ' (turned off)'}`,
-            a.reasons.length ? a.reasons.map((x) => x.text).join(' ') : (a.notes[0] || (a.fromStore ? 'From the browser’s add-on store.' : 'Nothing about it needs your attention.')),
-            a.badge ? `If you did not add it yourself, remove it at ${copy(b.places.addons)}` : '')).join('')}</ul>`
+            a.reasons.length ? a.reasons.map((x) => x.text).join(' ') : (a.notes[0] || (a.fromStore ? 'From the browser\'s add-on store.' : 'Nothing about it needs your attention.')),
+            a.badge ? removal(b, a, short) : '')).join('')}</ul>`
             : '<div class="empty"><p>No add-ons.</p></div>'}
           <h4 class="u-mt">Sites allowed to send notifications</h4>
           ${p.notifications === null ? '<div class="empty"><p>These could not be read.</p></div>'
@@ -1485,29 +1560,32 @@
               <p class="muted u-mt-xs">Fake virus alerts and prize pop-ups arrive this way. To stop a site, remove it at ${copy(b.places.notifications)}</p>`
               : '<div class="empty"><p>No site may send notifications.</p></div>'}
           ${p.search ? `<h4 class="u-mt">Search engine</h4><ul class="list">${row(searchBadge ? Masks.svg('scam') : ICON.search, searchBadge, p.search.name || p.search.host || 'Custom',
-            p.search.host && !p.search.known ? `${p.search.host} is not a search engine people know. Unwanted software changes your search to earn from what you look for.${p.search.verdict && p.search.verdict.badge ? ` ${p.search.verdict.label}.` : ''}` : `${p.search.engine || p.search.host || 'A search engine'} runs your searches.`,
-            searchBadge ? `To choose your own, ${settings ? `open ${copy(settings)} and search its settings for “search engine”` : `go to ${copy(b.places.search)}`}` : '')}</ul>` : ''}
+            p.search.host && !p.search.known ? `${p.search.host} is not a search engine people know. Unwanted software changes your search to earn from what you look for.${p.search.verdict && p.search.verdict.badge ? ` ${p.search.verdict.label}.` : ''}` : `${p.search.engine || p.search.name || p.search.host || 'A search engine'} runs your searches.`,
+            searchBadge ? `To choose your own, ${settings ? `open ${copy(settings)} and search its settings for "search engine"` : `go to ${copy(b.places.search)}`}` : '')}</ul>` : ''}
           ${p.startup.length ? `<h4 class="u-mt">Pages it opens on start</h4><ul class="list">${p.startup.map((s) => siteRow(s.url, s, 'Opens when the browser starts')).join('')}</ul>
-            ${p.startup.some(siteBadge) ? `<p class="muted u-mt-xs">To change them, ${settings ? `open ${copy(settings)} and search its settings for “on startup”` : `go to ${copy(b.places.startup)}`}</p>` : ''}` : ''}`;
+            ${p.startup.some(siteBadge) ? `<p class="muted u-mt-xs">To change them, ${settings ? `open ${copy(settings)} and search its settings for "on startup"` : `go to ${copy(b.places.startup)}`}</p>` : ''}` : ''}`;
       }).join('');
       return `<div class="panel u-mt">
         <div class="panel__head"><div><h2>${esc(b.name)}</h2><p>${b.profiles.length} profile${b.profiles.length === 1 ? '' : 's'}</p></div>
-          <button class="btn btn--sm" type="button" data-open-browser="${esc(b.id)}">Open ${esc(short)}</button></div>
+          <button class="btn btn--sm" type="button" data-open-browser="${esc(b.open || b.id)}">Open ${esc(short)}</button></div>
         ${pol ? `<ul class="list">${row(pol.badge ? ICON.lock : ICON.shield, pol.badge, 'Policies on this computer', `${pol.text} Set: ${pol.names.slice(0, 8).join(', ')}${pol.names.length > 8 ? ', and more' : ''}.`,
-          pol.badge ? `${short} lists them at ${copy(b.places.policies)} Removing them needs this computer’s administrator; if nobody set them on purpose, ask someone you trust to help.` : '')}</ul>` : ''}
+          pol.badge ? `${short} lists them at ${copy(b.places.policies)} Removing them needs this computer's administrator; if nobody set them on purpose, ask someone you trust to help.` : '')}</ul>` : ''}
         ${profiles}
       </div>`;
     }).join('');
 
+    const list = (names) => (names.length > 1 ? `${names.slice(0, -1).join(', ')} or ${names[names.length - 1]}` : names[0] || 'browser');
+    const notChecked = (r.unchecked || []).length ? `<p class="muted">Not checked: ${esc(r.unchecked.join(', '))}. Sentinel cannot read ${r.unchecked.length === 1 ? 'its' : 'their'} settings yet.</p>` : '';
     out.innerHTML = r.browsers.length ? `<div class="panel u-mt">
         <h2>${flagged ? `${flagged} thing${flagged === 1 ? '' : 's'} to look at` : 'Nothing here needs your attention'}</h2>
-        <p class="muted">Checked ${esc(ago(r.at))}. Sentinel changed nothing. Removing anything is your choice, in the browser, and the browser can add it back.${r.sitesChecked ? '' : ' Site addresses could not be checked just now, so only add-ons, search engines and policies were judged.'}</p>
+        <p class="muted">Checked ${esc(ago(r.at))}. Sentinel changed nothing. Removing anything is your choice, in the browser, and the browser can add it back.${r.sitesChecked ? '' : ` Site addresses were not checked, so only add-ons, search engines and policies were judged. ${esc(r.sitesWhy || 'Sentinel could not reach its scanner just now.')}`}</p>
+        ${notChecked}
       </div>${panels}`
-      : '<div class="panel u-mt"><div class="empty"><p>No Chrome, Edge, Brave, Vivaldi, Firefox or LibreWolf settings were found on this computer.</p></div></div>';
+      : `<div class="panel u-mt"><div class="empty"><p>No ${esc(list(r.looked || []))} settings were found on this computer.</p>${notChecked}</div></div>`;
 
     $$('[data-copy-text]', out).forEach((btn) => btn.addEventListener('click', async () => {
-      try { await navigator.clipboard.writeText(btn.dataset.copyText); toast('Copied. Paste it into the browser’s address bar.', 'success'); }
-      catch { toast('Could not copy. Type it into the browser’s address bar instead.', 'error'); }
+      try { await navigator.clipboard.writeText(btn.dataset.copyText); toast('Copied. Paste it into the browser\'s address bar.', 'success'); }
+      catch { toast('Could not copy. Type it into the browser\'s address bar instead.', 'error'); }
     }));
     $$('[data-open-browser]', out).forEach((btn) => btn.addEventListener('click', () => busy(btn, 'Opening', async () => {
       try { await desktop.openBrowser(btn.dataset.openBrowser); } catch (err) { toast(desktopError(err), 'error'); }
@@ -1620,29 +1698,48 @@
     if (!slot.isConnected || !s.supported) { slot.innerHTML = ''; return; }
     clearTimeout(slot._relock);
     const pinInput = (name, label, auto) => `<div class="field"><label for="pl-${name}">${label}</label><input class="input code-input" id="pl-${name}" name="${name}" type="password" inputmode="numeric" pattern="[0-9]{4,8}" minlength="4" maxlength="8" autocomplete="${auto}" required></div>`;
-    const adminNote = s.admin ? '<p class="field__hint">This Windows account is an administrator, so it can still uninstall Sentinel. On a child\'s own standard Windows account, the lock holds.</p>' : '';
+    // Sentinel is installed for one Windows account, and that account can uninstall it, administrator or not.
+    const adminNote = `<p class="field__hint">The lock stops protection being switched off inside Sentinel. Whoever uses this Windows account can still uninstall Sentinel from Windows Settings${s.admin ? ', and this account is an administrator, so it can change anything on the computer' : ''}. If Sentinel stops without the PIN, the record says when.</p>`;
     const newPin = (button) => `<form data-pl-set class="u-mt-sm">${pinInput('pin', 'New PIN, 4 to 8 digits', 'new-password')}${pinInput('again', 'The same PIN again', 'new-password')}<button class="btn btn--gold u-mt-sm" type="submit">${button}</button></form>`;
     const when = (at) => new Date(at).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit', month: 'short', day: 'numeric' });
+    const record = s.record || [];
+    const recordList = `<h3 class="u-mt">Record</h3>
+        <p class="field__hint">Times and switches only. Nothing about a chat or a page is ever written here.</p>
+        ${record.length ? `<ul class="list">${record.slice(0, 10).map((r) => `<li><span class="list__icon">${ICON.shield}</span><span class="list__main"><b>${esc(r.text)}${r.times > 1 ? ` (${r.times} times)` : ''}</b><span>${esc(when(r.at))}</span></span></li>`).join('')}</ul>` : '<div class="empty"><p>Nothing yet.</p></div>'}`;
+    const minutes = (n) => (n >= 60 ? `${Math.ceil(n / 60)} minute${Math.ceil(n / 60) === 1 ? '' : 's'}` : `${n} second${n === 1 ? '' : 's'}`);
     let body;
     if (!s.set) {
-      body = `<p class="muted u-mt-sm">Off.</p>${newPin('Lock with this PIN')}${adminNote}`;
+      // With no PIN the record stays readable: a PIN removed with an administrator's approval is written there.
+      body = `<p class="muted u-mt-sm">Off.</p>${newPin('Lock with this PIN')}${adminNote}${record.length ? recordList : ''}`;
     } else if (s.locked) {
-      body = `<p class="muted u-mt-sm">On. Switching protection off, or quitting Sentinel, needs the PIN.${s.waitSeconds ? ` Too many wrong PINs: try again in ${s.waitSeconds} seconds.` : ''}</p>
-        <form data-pl-unlock class="u-mt-sm">${pinInput('pin', 'PIN', 'current-password')}<button class="btn u-mt-sm" type="submit">Unlock for 5 minutes</button></form>
+      const wait = s.waitSeconds > 0;
+      body = `<p class="muted u-mt-sm">On. Switching protection off, or quitting Sentinel, needs the PIN.${wait ? ` Too many wrong PINs: try again in <span data-pl-wait>${minutes(s.waitSeconds)}</span>.` : ''}</p>
+        <form data-pl-unlock class="u-mt-sm">${pinInput('pin', 'PIN', 'current-password')}<button class="btn u-mt-sm" type="submit" ${wait ? 'disabled' : ''}>Unlock for 5 minutes</button></form>
         <p class="field__hint">Forgot the PIN? <button class="btn btn--ghost btn--sm" type="button" data-pl-reset>Remove it with a Windows administrator</button></p>${adminNote}`;
+      // The wait counts down, and the button comes back by itself when it ends.
+      if (wait) {
+        const ends = Date.now() + s.waitSeconds * 1000;
+        const tick = () => {
+          if (!slot.isConnected) return;
+          const left = Math.ceil((ends - Date.now()) / 1000);
+          if (left <= 0) { renderParentLock(slot); return; }
+          const el = $('[data-pl-wait]', slot);
+          if (el) el.textContent = minutes(left);
+          slot._relock = setTimeout(tick, 1000);
+        };
+        slot._relock = setTimeout(tick, 1000);
+      }
     } else {
-      const record = s.record || [];
       body = `<p class="muted u-mt-sm">Open until ${esc(new Date(s.unlockedUntil).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }))}, then it locks again by itself. Change what you need now, in this page or in the tray menu.</p>
         <div class="actions__btns u-mt-sm"><button class="btn btn--gold btn--sm" type="button" data-pl-relock>Lock now</button><button class="btn btn--sm" type="button" data-pl-remove>Turn off parent lock</button></div>
         ${newPin('Change the PIN')}
-        <h3 class="u-mt">Record</h3>
-        <p class="field__hint">Times and switches only. Nothing about a chat or a page is ever written here.</p>
-        ${record.length ? `<ul class="list">${record.slice(0, 10).map((r) => `<li><span class="list__icon">${ICON.shield}</span><span class="list__main"><b>${esc(r.text)}</b><span>${esc(when(r.at))}</span></span></li>`).join('')}</ul>` : '<div class="empty"><p>Nothing yet.</p></div>'}`;
+        ${recordList}`;
       slot._relock = setTimeout(() => { if (slot.isConnected) renderParentLock(slot); }, Math.max(1000, s.unlockedUntil - Date.now() + 1000));
     }
     slot.innerHTML = `<div class="panel u-mt">
       <div class="panel__head"><div><h2>Parent lock</h2>
-        <p>With a PIN set, switching off chat safety, live scanning, defense, download protection or checking copied links, switching to another Sentinel version, or quitting Sentinel, needs the PIN, here and in the tray menu. Turning protection on never does. On a computer a child uses, a stranger cannot talk them into switching Sentinel off.</p></div></div>
+        <p>With a PIN set, switching off any of Sentinel's protection on this page or in the tray, or quitting Sentinel, needs the PIN. So do putting a quarantined file back, telling the tech-support scam shield that you use a remote-control program yourself, and switching accounts. Turning protection on never does. On a computer a child uses, a stranger cannot talk them into switching Sentinel off.</p>
+        <p>It does not cover the browser companion or Windows administrator accounts.</p></div></div>
       ${body}
     </div>`;
 
@@ -1676,12 +1773,12 @@
     if (!d && !r) return now;
     return `${now} Since Sentinel started: ${d} message${d === 1 ? '' : 's'} checked in Discord, ${r} in Roblox, ${f} flagged.`;
   }
-  /** Texts in Phone Link: what it reads and what it never does, said before it is switched on. Off until turned on. */
+  /** Check my texts (Phone Link): what it reads and what it never does, said before it is switched on. Off until turned on. */
   function textSafetyPanel(info) {
     const ts = (info && info.textSafety) || { enabled: false, supported: false };
     if (!desktop || !desktop.setTextSafety) return '';
     return `<div class="panel u-mt" id="text-safety">
-      <div class="panel__head"><div><h2>Check my texts: Phone Link</h2>
+      <div class="panel__head"><div><h2>Check my texts</h2>
         <p>If your phone's texts show on this computer through Phone Link, Sentinel points out scam texts (unpaid tolls, parcel fees, "Hi Mum, this is my new number", task jobs, "your account is locked") right beside the message, while Phone Link is in front.</p></div>
         <input class="switch" type="checkbox" data-text-safety aria-label="Check my texts" ${ts.enabled ? 'checked' : ''} ${ts.supported ? '' : 'disabled'}></div>
       <p class="muted u-mt-sm" data-text-seen>${textSeenText(ts)}</p>
@@ -1692,14 +1789,16 @@
       </ul>
     </div>`;
   }
-  // What text checking is doing right now, in numbers only.
+  // What Check my texts is doing right now, in numbers only.
   function textSeenText(ts) {
     if (!ts.enabled) return 'Off. Turn it on, then open a conversation in Phone Link.';
     const s = ts.seen || {};
-    const now = s.app === 'phonelink' ? (s.reading ? 'Checking Phone Link now.' : 'Phone Link is in front, but its texts cannot be read yet.') : 'On. It starts checking when Phone Link is in front.';
+    const now = s.app === 'phonelink' ? (s.reading ? 'Checking Phone Link now.' : s.otherTab ? 'Phone Link is in front. Texts are checked on its Messages tab.' : 'Phone Link is in front, but its texts cannot be read yet.') : 'On. It starts checking when Phone Link is in front.';
     const n = s.checked || 0, f = s.flagged || 0;
-    if (!n) return now;
-    return `${now} Since Sentinel started: ${n} text${n === 1 ? '' : 's'} checked, ${f} flagged.`;
+    const u = s.unchecked || 0;
+    const missed = u ? ` ${u} link${u === 1 ? '' : 's'} in texts could not be checked against the threat lists: ${String(s.why || "Sentinel's scanner could not be reached").replace(/\.$/, '')}. The words were still checked.` : '';
+    if (!n) return now + missed;
+    return `${now} Since Sentinel started: ${n} text${n === 1 ? '' : 's'} checked, ${f} flagged.${missed}`;
   }
   function bindTextSafety(slot) {
     const sw = $('[data-text-safety]', slot);
@@ -1712,28 +1811,51 @@
     sw.addEventListener('change', async () => {
       try {
         const s = await desktop.setTextSafety(sw.checked);
-        toast(s.enabled ? 'Text checking is on. Open a conversation in Phone Link and Sentinel checks it.' : 'Text checking is off.', 'success');
+        toast(s.enabled ? 'Check my texts is on. Open a conversation in Phone Link and Sentinel checks it.' : 'Check my texts is off.', 'success');
       } catch (err) { sw.checked = !sw.checked; toast(desktopError(err), 'error'); }
     });
   }
-  // Asked once, in the Windows app, before chat safety ever reads anything: what it does, then Turn on or Not now.
+  const CHAT_ON = 'Chat safety is on. Open Roblox or Discord and Sentinel watches their chat.';
+  const EXPOSURE_ON = 'Exposure alerts are on. Sentinel will tell you if a site you visit is listed later.';
+
+  /*
+   * "New in Sentinel" cards: asked once, in the Windows app, before a feature ever reads anything. What it does, then
+   * Turn on or Not now. The answer (or switching the feature in Live protection) is kept in local storage as
+   * sentinel:asked:<name>, never sent anywhere. Before 1.12.1 the keys were sentinel.chatAsked and
+   * sentinel.exposureAsked; they are moved over once.
+   */
+  const ASKED = { chat: ['sentinel:asked:chat', 'sentinel.chatAsked'], exposure: ['sentinel:asked:exposure', 'sentinel.exposureAsked'] };
+  function asked(name) {
+    const [key, old] = ASKED[name];
+    try {
+      if (localStorage.getItem(old)) { localStorage.setItem(key, '1'); localStorage.removeItem(old); }
+      return Boolean(localStorage.getItem(key));
+    } catch { return true; }   // storage cannot be used: never ask, rather than ask every time
+  }
+  function markAsked(name) { try { localStorage.setItem(ASKED[name][0], '1'); } catch { /* not stored */ } }
+  function askOnce(slot, { name, title: heading, body, yes, onYes, howHref }) {
+    slot.innerHTML = `<div class="locked u-mt">
+      <div><span class="locked__tag">${ICON.shield}New in Sentinel</span><h3>${heading}</h3><p>${body}</p></div>
+      <div class="locked__actions"><button class="btn btn--gold" data-ask-yes>${yes}</button><button class="btn" data-ask-no>Not now</button><a class="btn btn--ghost" href="${howHref}">How it works</a></div>
+    </div>`;
+    const done = () => { markAsked(name); slot.innerHTML = ''; };
+    $('[data-ask-no]', slot).addEventListener('click', done);
+    $('[data-ask-yes]', slot).addEventListener('click', async (ev) => {
+      ev.target.disabled = true;
+      try { await onYes(); done(); }
+      catch (err) { ev.target.disabled = false; toast(desktopError(err), 'error'); }
+    });
+  }
+
   async function askChatSafety(slot) {
-    if (!slot || !desktop || !desktop.setChatSafety) return;
-    try { if (localStorage.getItem('sentinel.chatAsked')) return; } catch { return; }
+    if (!slot || !desktop || !desktop.setChatSafety || asked('chat')) return;
     let info = state.desktopInfo;
     try { if (!info) info = state.desktopInfo = await desktop.info(); } catch { return; }
     if (!info.chatSafety || !info.chatSafety.supported || info.chatSafety.enabled || !slot.isConnected) return;
-    slot.innerHTML = `<div class="locked u-mt">
-      <div><span class="locked__tag">${ICON.shield}New in Sentinel</span><h3>Chat safety for Roblox and Discord</h3>
-        <p>Sentinel can point out scams and people who may not be safe to talk to, right beside the message, while Roblox or the Discord app is in front. It reads chat on this computer only and keeps nothing; a badge shows while it watches, and in a Roblox game only when you press Esc. Turn it on for yourself, or for a child who uses this computer.</p></div>
-      <div class="locked__actions"><button class="btn btn--gold" data-chat-yes>Turn on chat safety</button><button class="btn" data-chat-no>Not now</button><a class="btn btn--ghost" href="/app/protection#chat-safety">How it works</a></div>
-    </div>`;
-    const done = () => { try { localStorage.setItem('sentinel.chatAsked', '1'); } catch { /* not stored */ } slot.innerHTML = ''; };
-    $('[data-chat-no]', slot).addEventListener('click', done);
-    $('[data-chat-yes]', slot).addEventListener('click', async (ev) => {
-      ev.target.disabled = true;
-      try { await desktop.setChatSafety(true); toast('Chat safety is on. Open Roblox or Discord and Sentinel watches their chat.', 'success'); done(); }
-      catch (err) { ev.target.disabled = false; toast(desktopError(err), 'error'); }
+    askOnce(slot, {
+      name: 'chat', title: 'Chat safety for Roblox and Discord', yes: 'Turn on chat safety', howHref: '/app/protection#chat-safety',
+      body: 'Sentinel can point out scams and people who may not be safe to talk to, right beside the message, while Roblox or the Discord app is in front. It reads chat on this computer only and keeps nothing; a badge shows while it watches, and in a Roblox game only when you press Esc. Turn it on for yourself, or for a child who uses this computer.',
+      onYes: async () => { await desktop.setChatSafety(true); toast(CHAT_ON, 'success'); }
     });
   }
   function bindChatSafety(slot) {
@@ -1747,28 +1869,33 @@
     sw.addEventListener('change', async () => {
       try {
         const s = await desktop.setChatSafety(sw.checked);
-        try { localStorage.setItem('sentinel.chatAsked', '1'); } catch { /* not stored */ }
-        toast(s.enabled ? 'Chat safety is on. Open Roblox or Discord and Sentinel watches their chat.' : 'Chat safety is off.', 'success');
+        markAsked('chat');
+        toast(s.enabled ? CHAT_ON : 'Chat safety is off.', 'success');
       } catch (err) { sw.checked = !sw.checked; toast(desktopError(err), 'error'); }
     });
   }
 
   /* Exposure alerts: sites visited in the last 14 days that a threat list named afterwards (server/lib/scan/exposure.js). */
   const EXPOSURE_WHAT = { phishing: 'Fake sign-in page', crypto: 'Crypto scam', scam: 'Scam site', malware: 'Spreads malware' };
+  // The password and scan steps are the shared ones (steps.js), the same words as the recovery guide's.
   function exposureSteps(e) {
-    const real = e.realSite ? ` (<b>${esc(e.realSite)}</b>)` : '';
-    if (e.kind === 'phishing') return `If you signed in or typed a password there, change that password now on the real site${real}, and anywhere else you use it. Then look for sign-ins or changes you do not recognise.`;
-    if (e.kind === 'crypto') return 'If you connected a wallet or signed anything there, remove that site’s permissions in your wallet and move what is left to a new wallet. Never type a recovery phrase into any site.';
-    if (e.kind === 'malware') return 'If you downloaded or opened anything from it, check that day’s downloads now. If you ran a program from it, run a full scan with your antivirus too.';
+    const S = window.SentinelSteps.text;
+    if (e.kind === 'phishing') return `Signed in or typed a password there? ${esc(S.password)}${e.realSite ? ` The real site is <b>${esc(e.realSite)}</b>.` : ''} Then look for sign-ins or changes you do not recognise.`;
+    if (e.kind === 'crypto') return 'If you connected a wallet or signed anything there, remove that site\'s permissions in your wallet and move what is left to a new wallet. Never type a recovery phrase into any site.';
+    if (e.kind === 'malware') return `If you downloaded or opened anything from it, check that day's downloads now. Ran a program from it? ${esc(S.scan)}`;
     return 'If you paid or gave card details there, call your bank or card company on the number printed on your card and ask about a refund. Watch your statements for charges you did not make.';
   }
+  // What to tick in the recovery guide for each kind of listing.
+  const EXPOSURE_HAPPENED = { phishing: 'password', crypto: 'crypto', malware: 'file', scam: 'card' };
   function exposureItem(e) {
+    // The day is the visit's own calendar day, where the person was, kept as midnight UTC (exposure.js remember).
     const day = new Date(e.visitedAt).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'UTC' });
     const malware = e.kind === 'malware';
     return `<li class="exposure">
       <span class="list__icon" style="color:${esc(color(malware ? 'red' : 'orange'))}">${Masks.svg(malware ? 'malware' : 'scam')}</span>
       <span class="list__main"><b>${esc(e.host)}</b><span>${esc(EXPOSURE_WHAT[e.kind] || 'Listed')} &middot; you visited it on ${esc(day)}, and a threat list named it ${esc(ago(e.listedAt))}.</span>
         <span>${exposureSteps(e)}</span>
+        <span>Already paid or let someone in? <a href="/app/recover?happened=${EXPOSURE_HAPPENED[e.kind] || 'card'}">Open the recovery guide</a></span>
         <span class="exposure__actions">
           ${malware && desktop.checkDownloadsFrom ? `<button class="btn btn--sm btn--gold" data-exposure-downloads="${esc(String(e.visitedAt))}">Check that day&rsquo;s downloads</button>` : ''}
           ${e.realSite ? `<a class="btn btn--sm btn--gold" href="https://${esc(e.realSite)}/" target="_blank" rel="noopener noreferrer">Go to ${esc(e.realSite)}</a>` : ''}
@@ -1780,14 +1907,22 @@
     if (!desktop || !desktop.setExposureAlerts) return '';
     const on = Boolean(info && info.exposureAlerts);
     const supported = Boolean(info && info.live && info.live.supported);
+    // Sites are remembered only while live scanning runs: with it off, "nothing so far" would be no news at all.
+    const empty = !supported ? 'Available on Windows, with live scanning.'
+      : !on ? 'Off. Nothing about the sites you visit is remembered.'
+        : !(info.live && info.live.enabled) ? 'On, but live scanning is off, so no sites are being remembered. Start scanning to use exposure alerts.'
+          : 'Nothing so far. None of the sites you visited in the last 14 days has been put on a threat list since.';
+    // The marks live with whichever Sentinel server the app uses: its own, on this computer, or one set up for it.
+    let where = 'on this computer';
+    if (info && !info.embeddedServer) { try { where = `on the Sentinel server this app uses (${new URL(info.origin).host})`; } catch { where = 'on the Sentinel server this app uses'; } }
     return `<div class="panel u-mt" id="exposures">
-      <div class="panel__head"><div><h2>Sites you visited that were listed later</h2>
+      <div class="panel__head"><div><h2>Exposure alerts</h2>
         <p>A scam page often reaches the threat lists hours or days after it goes up. With this on, Sentinel remembers the sites live scanning found safe for 14 days, and tells you if a list names one of them afterwards, with what to do.</p></div>
         <input class="switch" type="checkbox" data-exposure-alerts aria-label="Exposure alerts" ${on ? 'checked' : ''} ${supported ? '' : 'disabled'}></div>
       ${items.length ? `<ul class="list">${items.map(exposureItem).join('')}</ul>`
-        : `<p class="muted u-mt-sm">${!supported ? 'Available on Windows, with live scanning.' : on ? 'Nothing so far. None of the sites you visited in the last 14 days has been put on a threat list since.' : 'Off. Nothing about the sites you visit is remembered.'}</p>`}
+        : `<p class="muted u-mt-sm">${empty}</p>`}
       <ul class="live__facts">
-        <li>Kept on this computer as a scrambled code of each site&rsquo;s name and the day, never the address or the time, and erased after 14 days. Turning this off erases every one.</li>
+        <li>Kept ${esc(where)} as a scrambled code of each site&rsquo;s name and the day, never the address or the time, and erased after 14 days. Turning this off erases every one, and every alert found so far. The copies Sentinel keeps to repair its accounts file can hold them for up to 7 more days.</li>
         <li>Private windows are never remembered. Pages on shared sites (a Google Sites page, a Netlify site) are left out, since one bad page there says nothing about the one you saw.</li>
       </ul>
     </div>`;
@@ -1796,9 +1931,10 @@
     const sw = $('[data-exposure-alerts]', slot);
     if (sw && !sw.disabled) sw.addEventListener('change', async () => {
       try {
-        await desktop.setExposureAlerts(sw.checked);
-        try { localStorage.setItem('sentinel.exposureAsked', '1'); } catch { /* not stored */ }
-        toast(sw.checked ? 'Exposure alerts are on. Sentinel will tell you if a site you visit is listed later.' : 'Exposure alerts are off, and every remembered site is erased.', 'success');
+        const r = await desktop.setExposureAlerts(sw.checked);
+        markAsked('exposure');
+        if (!sw.checked && r && r.erased === false) toast('Exposure alerts are off. The remembered sites could not be erased just now, so Sentinel will try again each time it starts.', 'success');
+        else toast(sw.checked ? EXPOSURE_ON : 'Exposure alerts are off. Every remembered site is erased.', 'success');
       } catch (err) { sw.checked = !sw.checked; toast(desktopError(err), 'error'); }
       renderDesktopControls(slot);
     });
@@ -1821,22 +1957,15 @@
   }
   // Asked once, in the Windows app, once live scanning is in use: what exposure alerts do, then Turn on or Not now.
   async function askExposureAlerts(slot) {
-    if (!slot || !desktop || !desktop.setExposureAlerts) return;
-    try { if (localStorage.getItem('sentinel.exposureAsked')) return; } catch { return; }
+    if (!slot || !desktop || !desktop.setExposureAlerts || asked('exposure')) return;
     let info = state.desktopInfo;
     try { if (!info) info = state.desktopInfo = await desktop.info(); } catch { return; }
-    if (info.exposureAlerts || !info.live || !info.live.supported || !info.live.enabled || !slot.isConnected) return;
-    slot.innerHTML = `<div class="locked u-mt">
-      <div><span class="locked__tag">${ICON.shield}New in Sentinel</span><h3>Hear about it if a site you visited turns out to be a scam</h3>
-        <p>Scam pages often reach the threat lists a day or two after they go up. Sentinel can remember the sites live scanning found safe for 14 days, on this computer only and as scrambled codes, and tell you if a list names one of them later, with what to change.</p></div>
-      <div class="locked__actions"><button class="btn btn--gold" data-exposure-yes>Turn on exposure alerts</button><button class="btn" data-exposure-no>Not now</button><a class="btn btn--ghost" href="/app/protection#exposures">How it works</a></div>
-    </div>`;
-    const done = () => { try { localStorage.setItem('sentinel.exposureAsked', '1'); } catch { /* not stored */ } slot.innerHTML = ''; };
-    $('[data-exposure-no]', slot).addEventListener('click', done);
-    $('[data-exposure-yes]', slot).addEventListener('click', async (ev) => {
-      ev.target.disabled = true;
-      try { await desktop.setExposureAlerts(true); toast('Exposure alerts are on. Sentinel will tell you if a site you visit is listed later.', 'success'); done(); }
-      catch (err) { ev.target.disabled = false; toast(desktopError(err), 'error'); }
+    // The card promises "on this computer only", which holds only with the app's own server.
+    if (info.exposureAlerts || !info.embeddedServer || !info.live || !info.live.supported || !info.live.enabled || !slot.isConnected) return;
+    askOnce(slot, {
+      name: 'exposure', title: 'Hear about it if a site you visited turns out to be a scam', yes: 'Turn on exposure alerts', howHref: '/app/protection#exposures',
+      body: 'Scam pages often reach the threat lists a day or two after they go up. Sentinel can remember the sites live scanning found safe for 14 days, on this computer only and as scrambled codes, and tell you if a list names one of them later, with what to change.',
+      onYes: async () => { await desktop.setExposureAlerts(true); toast(EXPOSURE_ON, 'success'); }
     });
   }
 
@@ -1907,8 +2036,9 @@
             <input class="switch" type="checkbox" data-defense ${df.active ? 'checked' : ''} ${df.supported ? '' : 'disabled'}></label>
           <label class="setting"><div><b>Download protection</b><span>${esc(info.downloads.active ? `Watching ${info.downloads.folder || 'Downloads'}` : info.downloads.reason || 'Off')}</span></div><input class="switch" type="checkbox" data-dl ${info.downloads.active ? 'checked' : ''}></label>
           ${desktop.setClipboardCheck ? `<label class="setting"><div><b>Check links I copy</b><span>Copy a link from a text message, a chat or a PDF and Sentinel checks it, and warns you only if it is dangerous. Only copied web links are read; nothing else on your clipboard is sent or kept.</span></div><input class="switch" type="checkbox" data-clip ${info.clipboardCheck ? 'checked' : ''}></label>` : ''}
-          ${desktop.setCommandShield && info.platform === 'win32' ? `<label class="setting"><div><b>Stop pasted commands</b><span>Fake "I am not a robot" pages copy a command and ask you to paste it into Windows. While a browser is open, Sentinel takes such a command off your clipboard and tells you, with a way to put it back. Copied text is checked on this computer and never sent or kept.</span></div><input class="switch" type="checkbox" data-shield ${info.commandShield ? 'checked' : ''}></label>` : ''}
-          ${desktop.setRemoteGuard && info.remoteGuard && info.remoteGuard.supported ? `<label class="setting"><div><b>Tech-support scam shield</b><span>When a page flagged as a scam takes the whole screen, Sentinel offers to close it. When a remote-control program such as AnyDesk or TeamViewer starts soon after a flagged page, or soon after it was downloaded, Sentinel asks whether someone on the phone told you to install it. Nothing is stopped unless you say so.${info.remoteGuard.trusted.length ? ` You use ${esc(info.remoteGuard.trusted.join(', '))} yourself.` : ''}</span></div><input class="switch" type="checkbox" data-remote-guard ${info.remoteGuard.enabled ? 'checked' : ''}></label>
+          ${desktop.setCommandShield && info.platform === 'win32' ? `<label class="setting"><div><b>Stop pasted commands</b><span>Fake "I am not a robot" pages copy a command and ask you to paste it into Windows. When you copy such a command in a browser, Sentinel takes it off your clipboard and tells you, with a way to put it back. Copied in another program, it only tells you. Copied text is checked on this computer and never sent or kept.</span></div><input class="switch" type="checkbox" data-shield ${info.commandShield ? 'checked' : ''}></label>
+          ${desktop.commandPutBack ? '<div class="setting" data-held hidden><div><b>Stopped command</b><span data-held-text></span></div><button class="btn btn--sm" data-put-back>Put it back</button></div>' : ''}` : ''}
+          ${desktop.setRemoteGuard && info.remoteGuard && info.remoteGuard.supported ? `<label class="setting"><div><b>Tech-support scam shield</b>${info.remoteGuard.enabled && !live.enabled ? '<span class="status is-locked">Needs live scanning</span>' : ''}<span>When a page flagged as a scam takes the whole screen, Sentinel offers to close it. When a remote-control program such as AnyDesk or TeamViewer starts soon after a flagged page, or soon after it was downloaded, Sentinel asks whether someone on the phone told you to install it. Nothing is stopped unless you say so. The way out of a full-screen page and the bank warning work while live scanning is on.${info.remoteGuard.trusted.length ? ` You use ${esc(info.remoteGuard.trusted.join(', '))} yourself.` : ''}</span></div><input class="switch" type="checkbox" data-remote-guard ${info.remoteGuard.enabled ? 'checked' : ''}></label>
           ${info.remoteGuard.trusted.length ? '<div class="setting"><div><b>Programs you use yourself</b><span>Sentinel does not ask about these.</span></div><button class="btn btn--sm" data-forget-remote>Ask again</button></div>' : ''}` : ''}
           <label class="setting"><div><b>Start with my computer</b><span>Keep protection running from the moment you sign in.</span></div><input class="switch" type="checkbox" data-login ${info.openAtLogin ? 'checked' : ''}></label>
           <div class="setting"><div><b>Sentinel ${esc(info.version)}</b><span>${esc(updateText(up))}</span></div>
@@ -1945,7 +2075,7 @@
           <span class="list__icon">${ICON.file}</span>
           <span class="list__main"><b>${esc(d.name)}</b><span>${bytes(d.size)} &middot; ${ago(d.scannedAt)} &middot; ${esc(d.label)}${d.badge && d.reason ? ` &middot; ${esc(d.reason)}` : ''}</span></span>
           ${d.badge && !d.quarantined ? `<button class="btn btn--sm" data-quarantine="${esc(d.id)}">Quarantine</button>` : d.quarantined ? '<span class="status">Quarantined</span>' : '<span class="status is-on">Clear</span>'}
-        </li>`).join('')}</ul>` : '<div class="empty"><p>New downloads will appear here once they’re scanned.</p></div>'}
+        </li>`).join('')}</ul>` : '<div class="empty"><p>New downloads will appear here once they are scanned.</p></div>'}
       </div>`;
 
     if (focusKey) {
@@ -2063,16 +2193,37 @@
     if (clip) clip.addEventListener('change', async () => {
       try {
         await desktop.setClipboardCheck(clip.checked);
-        toast(clip.checked ? 'Sentinel will check links you copy.' : 'Copied links are no longer checked.', 'success');
+        toast(clip.checked ? 'Check links I copy is on. Copy a link and Sentinel checks it.' : 'Check links I copy is off.', 'success');
       } catch (err) { clip.checked = !clip.checked; toast(desktopError(err), 'error'); }
     });
     const shieldSwitch = $('[data-shield]', slot);
     if (shieldSwitch) shieldSwitch.addEventListener('change', async () => {
       try {
         await desktop.setCommandShield(shieldSwitch.checked);
-        toast(shieldSwitch.checked ? 'Sentinel will stop commands copied from web pages.' : 'Copied commands are no longer stopped.', 'success');
+        toast(shieldSwitch.checked ? 'Stop pasted commands is on.' : 'Stop pasted commands is off.', 'success');
       } catch (err) { shieldSwitch.checked = !shieldSwitch.checked; toast(desktopError(err), 'error'); }
     });
+    // "Put it back" under the switch, for the two minutes Sentinel holds a stopped command (the notification has it too).
+    const heldRow = $('[data-held]', slot);
+    if (heldRow) {
+      let hideTimer = null;
+      const showHeld = (h) => {
+        clearTimeout(hideTimer);
+        heldRow.hidden = !h || h.until <= Date.now();
+        if (heldRow.hidden) return;
+        const at = new Date(h.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+        $('[data-held-text]', heldRow).textContent = `Taken off your clipboard at ${at}${h.host ? `, copied from ${h.host}` : ''}. ${h.reason}. If you trust it, you can put it back for two minutes.`;
+        hideTimer = setTimeout(() => { heldRow.hidden = true; }, h.until - Date.now());
+      };
+      showHeld(info.commandHeld);
+      if (desktop.onCommand) slot._off.push(desktop.onCommand((h) => { if (slot.isConnected) showHeld(h); }));
+      $('[data-put-back]', heldRow).addEventListener('click', async () => {
+        try {
+          const r = await desktop.commandPutBack();
+          toast(r.ok ? `The command is back on your clipboard. ${r.message}` : r.message, r.ok ? 'success' : 'info');
+        } catch (err) { toast(desktopError(err), 'error'); }
+      });
+    }
     const shield = $('[data-remote-guard]', slot);
     if (shield) shield.addEventListener('change', async () => {
       try {
@@ -2121,7 +2272,7 @@
       ultimate: ['Unlimited fast live scanning', '96 hours of delicate live scanning a week', 'Unlimited fast and 500 delicate link scans', '500 virus & malware scans', 'Full email scans & download protection', 'Everything in Max', 'Every model, in full']
     };
     el.innerHTML = `
-      ${title('Plan &amp; usage', `You’re on <b>${esc(plan().name)}</b>. Weekly allowances reset ${until(state.me.week.resetsAt)}.`)}
+      ${title('Plan &amp; usage', `You are on <b>${esc(plan().name)}</b>. Weekly allowances reset ${until(state.me.week.resetsAt)}.`)}
       ${demo ? '<div class="banner"><div><b>Demo billing.</b> Plan changes are instant and free on this server. No payment is taken.</div></div>' : ''}
       <div class="usage-list">
         ${scanCards(us)}
@@ -2146,7 +2297,7 @@
         const data = await api('/billing/plan', { method: 'POST', body: { plan: b.dataset.plan } });
         state.me = { ...state.me, user: data.user, plan: data.plan, usage: data.usage, week: data.week };
         paintAccount();
-        toast(`You’re now on ${data.plan.name}.`, 'success');
+        toast(`You are now on ${data.plan.name}.`, 'success');
         render();
       } catch (err) { toast(err.message, 'info', 6000); }
     })));
@@ -2176,7 +2327,7 @@
         <h2 class="u-mb">Change password</h2>
         <div class="row2">
           <div class="field"><label for="pw-cur">Current password</label><input class="input" id="pw-cur" type="password" name="currentPassword" autocomplete="current-password" required></div>
-          <div class="field"><label for="pw-new">New password</label><input class="input" id="pw-new" type="password" name="newPassword" autocomplete="new-password" required minlength="10"><span class="field__hint">10+ characters with a letter and a number. You’ll be signed out everywhere else.</span></div>
+          <div class="field"><label for="pw-new">New password</label><input class="input" id="pw-new" type="password" name="newPassword" autocomplete="new-password" required minlength="10"><span class="field__hint">10+ characters with a letter and a number. You will be signed out everywhere else.</span></div>
         </div>
         <button class="btn u-mt" type="submit">Update password</button>
       </form>` : ''}
@@ -2317,7 +2468,7 @@
   const chats = {};
 
   async function assistantsView(el, params) {
-    el.innerHTML = `${title('AI assistants', 'Optional. Ask ChatGPT, Claude, Gemini or DeepSeek about anything. Sentinel’s scans never depend on them.')}
+    el.innerHTML = `${title('AI assistants', 'Optional. Ask ChatGPT, Claude, Gemini or DeepSeek about anything. Sentinel\'s scans never depend on them.')}
       <div data-tabs><div class="skeleton skeleton--tabs"></div></div><div class="panel" data-pane><div class="skeleton u-h-lg"></div></div>`;
     let providers;
     try { ({ providers } = await api('/ai/providers')); } catch (err) { $('[data-pane]', el).innerHTML = `<div class="banner banner--error">${esc(err.message)}</div>`; return; }
@@ -2338,7 +2489,7 @@
   function renderConnect(pane, p) {
     pane.innerHTML = `
       <div class="connect-head"><span class="ai-tab__mark ai-tab__mark--lg" style="--accent:${esc(p.accent)}">${MARKS[p.id]}</span>
-        <div><h2>Connect ${esc(p.name)}</h2><p class="note">Uses ${esc(p.vendor)}’s official API with a key from your own account &middot; <span class="mono">${esc(p.model)}</span></p></div></div>
+        <div><h2>Connect ${esc(p.name)}</h2><p class="note">Uses ${esc(p.vendor)}'s official API with a key from your own account &middot; <span class="mono">${esc(p.model)}</span></p></div></div>
       <ol class="steps-list">
         <li>Open <a href="${esc(p.keyUrl)}" target="_blank" rel="noopener noreferrer" class="u-gold">${esc(new URL(p.keyUrl).host)}</a> and sign in to ${esc(p.vendor)} there.</li>
         <li>Create an API key and copy it.</li>

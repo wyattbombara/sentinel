@@ -227,7 +227,19 @@ const BRANDS = [
 
 ];
 
-module.exports = { BRANDS };
+// Banks, payment services and exchanges among the brands above, and big banks with no entry of their own (a brand
+// entry also drives lookalike detection, so these are only named here). One list for every place that needs to know
+// "this is where money moves": the tech-support scam shield's bank warning in the Windows app.
+const MONEY_TOKENS = ['paypal', 'venmo', 'zelle', 'cashapp', 'wise', 'revolut', 'chase', 'wellsfargo', 'bankofamerica', 'citibank',
+  'capitalone', 'americanexpress', 'usaa', 'truist', 'santander', 'hsbc', 'barclays', 'natwest', 'lloyds', 'interac', 'mercadopago',
+  'navyfederal', 'monzo', 'desjardins', 'scotiabank', 'tdbank', 'commbank', 'westpac', 'schwab', 'etrade', 'axisbank', 'coinbase', 'binance', 'kraken'];
+const MONEY_DOMAINS = [...new Set([
+  ...BRANDS.filter((b) => MONEY_TOKENS.includes(b.token)).flatMap((b) => b.domains),
+  'usbank.com', 'pnc.com', 'citizensbank.com', 'ally.com', 'discover.com', 'regions.com', 'fidelity.com', 'vanguard.com',
+  'rbcroyalbank.com', 'bmo.com', 'cibc.com', 'nationwide.co.uk', 'halifax.co.uk', 'starlingbank.com', 'anz.com.au', 'nab.com.au'
+])];
+
+module.exports = { BRANDS, MONEY_DOMAINS };
 
 },
 './lists': function (module, exports, require, __dirname) {
@@ -2481,7 +2493,7 @@ function shippedKnowledge(p) {
 function scanAddress(raw) {
   const url = typeof raw === 'string' && raw.trim() ? typedUrl(raw) : null;
   const p = url ? analyze(url) : null;
-  if (!p) return { ok: false, message: 'That doesn’t look like a web address.' };
+  if (!p) return { ok: false, message: 'That does not look like a web address.' };
   return assess(p).verdict;
 }
 
@@ -2523,7 +2535,7 @@ function assess(p) {
     reasons: reasonsOf(checks).slice(0, 5).map((r) => ({ threat: r.threat, text: r.text })),
     known: know.known,
     discounted: false,
-    checks: { total: tally.total, failed: tally.failed, warned: tally.warned, passed: tally.passed }
+    checks: { total: tally.total, failed: tally.failed, warned: tally.warned, passed: tally.passed, skipped: tally.skipped }
   };
   return { verdict, checks };
 }
@@ -2538,15 +2550,18 @@ module.exports = { scanAddress, _test: { checksOf } };
 
 }
 };
-const loaded = {};
-function load(name) {
-  if (name in builtins) return builtins[name];
-  if (!loaded[name]) {
-    const module = { exports: {} };
-    loaded[name] = module;
-    sources[name](module, module.exports, load, '');
-  }
-  return loaded[name].exports;
+/** A fresh set of the engine's modules. url.js keeps its word list once read, so a set made without one is thrown away. */
+function loader() {
+  const loaded = {};
+  return function load(name) {
+    if (name in builtins) return builtins[name];
+    if (!loaded[name]) {
+      const module = { exports: {} };
+      loaded[name] = module;
+      sources[name](module, module.exports, load, '');
+    }
+    return loaded[name].exports;
+  };
 }
 async function fetchWords() {
   const res = await fetch(wordsUrl);
@@ -2557,12 +2572,19 @@ async function fetchWords() {
   return new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
 }
 let ready = null;
+let engine = null;
 window.SentinelEngine = {
-  /** The fast check of one address, here in the browser: the same shape as the server's demo scan, plus local: true. */
+  /**
+   * The fast check of one address, here in the browser: the same shape as the server's demo scan, plus local: true.
+   * If the word list could not be fetched, names are not read as words and the result says so (partial: true); the
+   * next check fetches it again rather than running without it for the rest of the visit.
+   */
   scan(raw) {
-    // Without the word list, names are not read as words; every other check still runs.
-    ready = ready || fetchWords().then((text) => { words = text; }, () => {});
-    return ready.then(() => load('./offline').scanAddress(raw));
+    const got = ready || (ready = fetchWords().then((text) => { words = text; return true; }, () => { ready = null; return false; }));
+    return got.then((ok) => {
+      const v = (ok ? (engine = engine || loader()('./offline')) : loader()('./offline')).scanAddress(raw);
+      return ok || !v.ok ? v : { ...v, partial: true };
+    });
   }
 };
 })();
