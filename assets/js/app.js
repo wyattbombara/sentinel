@@ -166,6 +166,7 @@
     '/app/scan': ['scan', scanView],
     '/app/threats': ['threats', threatsView],
     '/app/email': ['email', emailView],
+    '/app/text': ['text', textView],
     '/app/history': ['history', historyView],
     '/app/protection': ['protection', protectionView],
     '/app/download': ['protection', protectionView],
@@ -197,7 +198,7 @@
     fn(el, new URLSearchParams(location.search));
     // Every view draws its forms synchronously before it waits on anything, so what was typed can go back in now.
     restoreDrafts();
-    document.title = `${{ home: 'Overview', scan: 'Link scan', threats: 'Virus & malware', email: 'Email scan', history: 'History', protection: 'Live protection', plan: 'Plan & usage', security: 'Security', assistants: 'AI assistants', sites: 'Site rules', checkup: 'Browser checkup', recover: 'Recovery guide' }[name]} · Sentinel`;
+    document.title = `${{ home: 'Overview', scan: 'Link scan', threats: 'Virus & malware', email: 'Email scan', text: 'Text scan', history: 'History', protection: 'Live protection', plan: 'Plan & usage', security: 'Security', assistants: 'AI assistants', sites: 'Site rules', checkup: 'Browser checkup', recover: 'Recovery guide' }[name]} · Sentinel`;
   }
 
   /** Render a verdict with its checklist tools and follow-up actions. */
@@ -228,7 +229,7 @@
 
   const PAGES = [
     ['Overview', '/app', 'home'], ['Link scan', '/app/scan', 'scan'], ['Virus & malware scan', '/app/threats', 'threats'],
-    ['Email scan', '/app/email', 'email'], ['History', '/app/history', 'history'], ['Site rules', '/app/sites', 'sites'], ['Browser checkup', '/app/checkup', 'checkup'],
+    ['Email scan', '/app/email', 'email'], ['Text scan', '/app/text', 'text'], ['History', '/app/history', 'history'], ['Site rules', '/app/sites', 'sites'], ['Browser checkup', '/app/checkup', 'checkup'],
     ['Live protection', '/app/protection', 'protection'], ['Plan & usage', '/app/plan', 'plan'], ['Security', '/app/security', 'security'],
     ['AI assistants', '/app/assistants', 'assistants'], ['Recovery guide', '/app/recover', 'recover']
   ];
@@ -1287,6 +1288,132 @@
     });
   }
 
+  /* ===================================================== text message scan */
+
+  // A text, WhatsApp message or DM, pasted in or read from a phone screenshot on this computer (the way the email scan
+  // reads one, then textshot.js picks out the sender and the messages). Judged on the server by the rules Phone Link
+  // checking uses (server/lib/scan/texts.js); links are checked by their address only. Nothing is kept.
+  function textView(el) {
+    const canRead = Boolean(desktop && desktop.readScreenshot);
+    const allowance = () => `${scanLeftText('fast')}. A text counts as one fast link scan, on every plan: its links are checked by their address only, not researched like a pasted email. Nothing is stored.`;
+    el.innerHTML = `
+      ${title('Text scan', 'Got a text, a WhatsApp message or a DM you are not sure about? Paste it in, or a screenshot of it, and Sentinel says if it looks like a scam and what to do.',
+        '<div class="segmented" role="tablist"><button role="tab" data-tmode="paste" aria-selected="true">Paste the text</button><button role="tab" data-tmode="shot" aria-selected="false">Screenshot</button></div>')}
+      <div class="panel" data-shot hidden>
+        <label class="drop" data-shot-drop>
+          <input type="file" accept="image/png,image/jpeg" data-shot-file aria-label="Choose a screenshot of the message">
+          <div><div class="drop__icon">${ICON.upload}</div><h3>Drop a screenshot from your phone, or click to choose</h3><p>Or press Ctrl+V to paste one. PNG or JPEG.</p></div>
+        </label>
+        <figure class="shot" data-shot-preview hidden><img alt="The screenshot to read"><figcaption data-shot-status></figcaption></figure>
+        <p class="field__hint u-mt-sm">${canRead
+          ? 'Read on this computer by Windows. The image is not uploaded or kept. If you replied in the conversation, crop the screenshot to the message you were sent.'
+          : 'Screenshots are read on your own computer by the Sentinel app for Windows, so they never have to be uploaded. <a class="u-gold" href="/download">Get the app</a>, or paste the text instead.'}</p>
+      </div>
+      <form class="panel" data-form>
+        <div class="field"><label for="t-from">From <span class="opt">(optional: the number, short code or name the message shows)</span></label><input class="input" id="t-from" name="from" placeholder="+1 415 555 0199" autocomplete="off" maxlength="80"></div>
+        <div class="field"><label for="t-text">Message</label><textarea class="textarea" id="t-text" name="text" rows="6" maxlength="2000" placeholder="Paste the message, including any links"></textarea></div>
+        <div class="report__foot">
+          <span class="muted" data-left>${esc(allowance())}</span>
+          <button class="btn btn--gold" type="submit">Check this text</button>
+        </div>
+      </form>
+      <div data-out aria-live="polite"></div>`;
+
+    const form = $('[data-form]', el);
+    const out = $('[data-out]', el);
+    const shotBox = $('[data-shot]', el);
+    const setMode = (mode) => {
+      $$('[data-tmode]', el).forEach((x) => x.setAttribute('aria-selected', String(x.dataset.tmode === mode)));
+      shotBox.hidden = mode !== 'shot';
+      form.hidden = mode === 'shot';
+    };
+    $$('[data-tmode]', el).forEach((b) => b.addEventListener('click', () => setMode(b.dataset.tmode)));
+
+    const preview = $('[data-shot-preview]', el);
+    const shotStatus = $('[data-shot-status]', el);
+    let reading = false;
+    const readShot = async (file) => {
+      if (!file || reading) return;
+      if (!/^image\/(png|jpeg)$/.test(file.type)) { toast('Screenshots must be PNG or JPEG images.', 'error'); return; }
+      if (file.size > 20 * 1024 * 1024) { toast('That screenshot is too large.', 'error'); return; }
+      const url = URL.createObjectURL(file);
+      $('img', preview).src = url;
+      preview.hidden = false;
+      if (!canRead) { shotStatus.textContent = 'Reading screenshots needs the Sentinel app for Windows.'; return; }
+      reading = true;
+      preview.classList.add('is-reading');
+      shotStatus.textContent = 'Reading the screenshot…';
+      try {
+        const m = window.SentinelTextShot.read(joinSlices(await desktop.readScreenshot(await sliceImage(file))));
+        if (!m.text) { shotStatus.textContent = 'No message was found in that image.'; return; }
+        shotStatus.textContent = m.from ? `Read a message from ${m.from}.` : 'Read the message.';
+        form.from.value = m.from;
+        form.text.value = m.text;
+        setMode('paste');
+        toast('Check what was read, then press Check this text.', 'info', 5000);
+        form.text.focus();
+      } catch (err) {
+        shotStatus.textContent = desktopError(err);
+      } finally {
+        reading = false;
+        preview.classList.remove('is-reading');
+        URL.revokeObjectURL(url);
+      }
+    };
+    const shotInput = $('[data-shot-file]', el);
+    shotInput.addEventListener('change', () => { readShot(shotInput.files[0]); shotInput.value = ''; });
+    const shotDrop = $('[data-shot-drop]', el);
+    ['dragenter', 'dragover'].forEach((t) => shotDrop.addEventListener(t, (ev) => { ev.preventDefault(); shotDrop.classList.add('is-over'); }));
+    ['dragleave', 'drop'].forEach((t) => shotDrop.addEventListener(t, (ev) => { ev.preventDefault(); shotDrop.classList.remove('is-over'); }));
+    shotDrop.addEventListener('drop', (ev) => readShot(ev.dataTransfer.files[0]));
+    // Ctrl+V with an image on the clipboard, on either tab: pasted words still go into the message box.
+    const onPaste = (ev) => {
+      if (!el.isConnected) { document.removeEventListener('paste', onPaste); return; }
+      const item = [...(ev.clipboardData ? ev.clipboardData.items : [])].find((i) => i.kind === 'file' && /^image\/(png|jpeg)$/.test(i.type));
+      if (item) { ev.preventDefault(); setMode('shot'); readShot(item.getAsFile()); }
+    };
+    document.addEventListener('paste', onPaste);
+
+    form.addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      if (!form.text.value.trim()) { toast('Paste the message you want checked.', 'error'); form.text.focus(); return; }
+      try {
+        const data = await busy($('button[type=submit]', form), 'Checking', () => api('/scan/text', { method: 'POST', body: { from: form.from.value, text: form.text.value } }));
+        applyUsage(data.usage);
+        $('[data-left]', el).textContent = allowance();
+        out.innerHTML = textResult(data.text, form.from.value.trim());
+        out.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+      } catch (err) { out.innerHTML = friendlyError(err); }
+    });
+  }
+
+  /** The verdict card for a text: what it is, why, what to do, and each link's own result. */
+  function textResult(r, from) {
+    const f = r.flag;
+    const red = r.links.some((l) => l.badge === 'red');
+    const tone = !f ? 'clear' : red ? 'red' : f.level === 'danger' ? 'orange' : 'yellow';
+    const who = !from ? 'No sender given' : `From ${from}${r.sender === 'number' ? ', a phone number' : r.sender === 'shortcode' ? ', a business short code' : r.sender === 'email' ? ', an email address' : ''}`;
+    const linkLine = (l) => `${l.host || l.url}: ${l.badge ? `${l.label}${l.reason ? `. ${l.reason}` : ''}` : l.label === 'Not checked' ? 'could not be checked just now' : 'no threat found'}`;
+    const reasons = [...(f ? [[f.detail, tone]] : []), ...r.links.map((l) => [linkLine(l), l.badge])];
+    // Family on a "new number" wants money sent; the rest want a card number or a sign-in.
+    const happened = f && /family/i.test(f.title) ? 'bank' : 'card,password';
+    const scam = f && (f.level === 'danger' || red);
+    const steps = f ? [f.advice] : [`Nothing in this text matches the scams Sentinel knows${r.links.length ? ', and its links are on no threat list' : ''}.`, 'Still unsure? Contact the company or person through their own app, website or a number you already have, not the one in the text.'];
+    return `<article class="result result--${tone}" data-result data-text-result="${tone}">
+      <header class="result__head">
+        <div class="result__glyph" style="--c:${color(tone === 'clear' ? null : tone)}">${Masks.svg('scam')}</div>
+        <div class="result__title">
+          <h2>${esc(f ? f.title : 'No signs of a scam in this text')}</h2>
+          <p class="result__sub">${esc(who)}</p>
+        </div>
+      </header>
+      <div class="next-steps next-steps--${tone}"><h3>${f ? 'What to do now' : 'Good to know'}</h3><ol>${steps.map((s) => `<li>${esc(s)}</li>`).join('')}</ol>
+        ${scam ? `<p class="next-steps__more">Already tapped the link, paid or replied? <a href="/app/recover?happened=${happened}">Open the recovery guide</a> for every step, in order.</p>` : ''}</div>
+      ${reasons.length ? `<div class="reasons"><h3>Why</h3><ul>${reasons.map(([t, badge]) => `<li><span class="dot" style="--c:${color(badge || null)}"></span>${esc(t)}</li>`).join('')}</ul></div>` : ''}
+      <div class="notes"><p>${r.links.length ? 'Links were checked by their address only and were not opened. ' : ''}The text was checked in memory and not kept, and it is not in your history.</p></div>
+    </article>`;
+  }
+
   /** PNG slices of an image, at most 2000 wide and 1600 tall, overlapping by 60 so no line is cut in half. */
   async function sliceImage(file) {
     const bmp = await createImageBitmap(file);
@@ -1965,6 +2092,68 @@
     })));
     if (desktop.onExposures) slot._off.push(desktop.onExposures(() => { if (slot.isConnected) renderDesktopControls(slot); }));
   }
+  /* Your sites: look-alikes of the sites this person uses, not only of the big brands (server/lib/scan/mysites.js). */
+  function mySitesPanel(info, sites) {
+    if (!desktop || !desktop.setMySites) return '';
+    const on = Boolean(info && info.mySites !== false);
+    // Kept only by the app's own server on this computer: with another server there is nothing to keep them in.
+    const local = Boolean(info && info.embeddedServer);
+    const row = (s) => `<li>
+      <span class="list__icon">${ICON.globe}</span>
+      <span class="list__main"><b class="mono">${esc(s.host)}</b><span>${s.source === 'you' ? 'Added by you' : 'Learned: you use it often'}</span></span>
+      <button class="btn btn--sm" data-my-site-remove="${esc(s.host)}">Remove</button>
+    </li>`;
+    const body = !local ? '<p class="muted u-mt-sm">Available when the app uses its own scanner on this computer.</p>'
+      : !on ? '<p class="muted u-mt-sm">Off. No sites are learned or kept.</p>'
+        : `<form class="my-sites__add" data-my-sites-add>
+            <input class="input mono" name="host" placeholder="mycu.org" aria-label="A site you use" autocomplete="off" spellcheck="false" maxlength="300" required>
+            <button class="btn btn--gold" type="submit">Add site</button>
+          </form>
+          ${sites.length ? `<ul class="list u-mt-sm">${sites.map(row).join('')}</ul>
+            <div class="report__foot"><span class="muted">${sites.length} site${sites.length === 1 ? '' : 's'}</span><button class="btn btn--sm" data-my-sites-forget>Forget all</button></div>`
+            : '<p class="muted u-mt-sm">None yet. A site you visit on three different days is added by itself, or add one now.</p>'}`;
+    return `<div class="panel u-mt" id="my-sites">
+      <div class="panel__head"><div><h2>Your sites</h2>
+        <p>Sentinel knows the big brands. Here it learns yours: your bank or credit union, your school portal, your work sign-in. A link or page made to look like one of them gets a warning, in live scanning, copied links, email and link scans.</p></div>
+        <input class="switch" type="checkbox" data-my-sites aria-label="Your sites" ${on ? 'checked' : ''} ${local ? '' : 'disabled'}></div>
+      ${body}
+      <ul class="live__facts">
+        <li>Kept on this computer only, as plain site names you can read here. A site you passed through is never written down: until a site has been seen on three days, only a scrambled code of it is kept.</li>
+        <li>Learned only from pages live scanning found safe, never from a private window. Turning this off forgets every site.</li>
+      </ul>
+    </div>`;
+  }
+  function bindMySites(slot) {
+    const sw = $('[data-my-sites]', slot);
+    if (sw && !sw.disabled) sw.addEventListener('change', async () => {
+      try {
+        const r = await desktop.setMySites(sw.checked);
+        toast(sw.checked ? 'Your sites: on. Sentinel will learn the sites you use.' : r && r.erased === false ? 'Your sites: off. The sites could not be erased just now, so Sentinel will try again each time it starts.' : 'Your sites: off. Every site is forgotten.', 'success');
+      } catch (err) { sw.checked = !sw.checked; toast(desktopError(err), 'error'); }
+      renderDesktopControls(slot);
+    });
+    const form = $('[data-my-sites-add]', slot);
+    if (form) form.addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      const input = form.elements.host;
+      try {
+        await desktop.addMySite(input.value);
+        toast('Added. Look-alikes of it now get a warning.', 'success');
+        renderDesktopControls(slot);
+      } catch (err) { input.setAttribute('aria-invalid', 'true'); toast(desktopError(err), 'error'); }
+    });
+    $$('[data-my-site-remove]', slot).forEach((b) => b.addEventListener('click', async () => {
+      b.disabled = true;
+      try { await desktop.removeMySite(b.dataset.mySiteRemove); renderDesktopControls(slot); }
+      catch (err) { b.disabled = false; toast(desktopError(err), 'error'); }
+    }));
+    const forget = $('[data-my-sites-forget]', slot);
+    if (forget) forget.addEventListener('click', async () => {
+      try { await desktop.forgetMySites(); toast('Every site is forgotten.', 'success'); renderDesktopControls(slot); }
+      catch (err) { toast(desktopError(err), 'error'); }
+    });
+  }
+
   // Asked once, in the Windows app, once live scanning is in use: what exposure alerts do, then Turn on or Not now.
   async function askExposureAlerts(slot) {
     if (!slot || !desktop || !desktop.setExposureAlerts || asked('exposure')) return;
@@ -1992,6 +2181,8 @@
     try { ledger = (await desktop.defense()).ledger || []; } catch { /* none */ }
     let exposures = [];
     try { if (desktop.exposures) exposures = await desktop.exposures(); } catch { /* none */ }
+    let mine = [];
+    try { if (desktop.mySites) mine = await desktop.mySites(); } catch { /* none */ }
     // Left the page while waiting: subscribing now would leave listeners behind that nothing ever removes.
     if (!slot.isConnected) return;
     const browsers = (info.browsers && info.browsers.installed) || [];
@@ -2048,6 +2239,7 @@
           ${desktop.setClipboardCheck ? `<label class="setting"><div><b>Check links I copy</b><span>Copy a link from a text message, a chat or a PDF and Sentinel checks it, and warns you only if it is dangerous. Only copied web links are read; nothing else on your clipboard is sent or kept.</span></div><input class="switch" type="checkbox" data-clip ${info.clipboardCheck ? 'checked' : ''}></label>` : ''}
           ${desktop.setCommandShield && info.platform === 'win32' ? `<label class="setting"><div><b>Stop pasted commands</b><span>Fake "I am not a robot" pages copy a command and ask you to paste it into Windows. When you copy such a command in a browser, Sentinel takes it off your clipboard and tells you, with a way to put it back. Copied in another program, it only tells you. Copied text is checked on this computer and never sent or kept.</span></div><input class="switch" type="checkbox" data-shield ${info.commandShield ? 'checked' : ''}></label>
           ${desktop.commandPutBack ? '<div class="setting" data-held hidden><div><b>Stopped command</b><span data-held-text></span></div><button class="btn btn--sm" data-put-back>Put it back</button></div>' : ''}` : ''}
+          ${desktop.setWalletGuard && info.platform === 'win32' ? `<label class="setting"><div><b>Wallet guard</b><span>Some malware waits for you to copy a crypto wallet address or an IBAN and swaps in its own. If the address you copied changes by itself a moment later, Sentinel puts yours back and tells you. Addresses are compared on this computer, in memory, and never sent, saved or logged.</span></div><input class="switch" type="checkbox" data-wallet-guard ${info.walletGuard ? 'checked' : ''}></label>` : ''}
           ${desktop.setRemoteGuard && info.remoteGuard && info.remoteGuard.supported ? `<label class="setting"><div><b>Tech-support scam shield</b>${info.remoteGuard.enabled && !live.enabled ? '<span class="status is-locked">Needs live scanning</span>' : ''}<span>When a page flagged as a scam takes the whole screen, Sentinel offers to close it. When a remote-control program such as AnyDesk or TeamViewer starts soon after a flagged page, or soon after it was downloaded, Sentinel asks whether someone on the phone told you to install it. Nothing is stopped unless you say so. The way out of a full-screen page and the bank warning work while live scanning is on.${info.remoteGuard.trusted.length ? ` You use ${esc(info.remoteGuard.trusted.join(', '))} yourself.` : ''}</span></div><input class="switch" type="checkbox" data-remote-guard ${info.remoteGuard.enabled ? 'checked' : ''}></label>
           ${info.remoteGuard.trusted.length ? '<div class="setting"><div><b>Programs you use yourself</b><span>Sentinel does not ask about these.</span></div><button class="btn btn--sm" data-forget-remote>Ask again</button></div>' : ''}` : ''}
           <label class="setting"><div><b>Start with my computer</b><span>Keep protection running from the moment you sign in.</span></div><input class="switch" type="checkbox" data-login ${info.openAtLogin ? 'checked' : ''}></label>
@@ -2059,6 +2251,7 @@
       </div>
 
       ${exposurePanel(info, exposures)}
+      ${mySitesPanel(info, mine)}
 
       ${chatSafetyPanel(info)}
       ${textSafetyPanel(info)}
@@ -2068,7 +2261,7 @@
           <div class="panel__head"><div><h2>Live, right now</h2><p>${live.active ? 'Pages show up here as they are checked. Private windows never do.' : 'Start scanning to see pages as they are checked.'}</p></div><span class="live-dot${live.active ? ' is-on' : ''}" aria-hidden="true"></span></div>
           <ul class="list feed" data-feed>${live.current && live.current.url ? `<li class="feed__item"><span class="list__icon">${ICON.globe}</span><span class="list__main"><b>${esc(live.current.url)}</b><span>In front now</span></span></li>` : '<li class="feed__empty muted">Nothing checked yet. Open a page in your browser.</li>'}</ul>
         </div>
-        <div class="panel">
+        <div class="panel" id="defense">
           <div class="panel__head"><div><h2>Defense log</h2><p>What arrived, what was scanned, what was stopped.</p></div></div>
           ${ledger.length ? `<ul class="list">${ledger.slice(0, 8).map((e) => `<li>
             <span class="list__icon" style="${e.kind === 'threat' ? 'color:var(--red)' : e.kind === 'suspect' ? 'color:var(--orange)' : e.kind === 'restored' ? 'color:var(--gold-300)' : ''}">${ICON.file}</span>
@@ -2092,20 +2285,16 @@
       const again = $$(`[data-${focusKey.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}]`, slot).find((el2) => el2.dataset[focusKey] === focusValue);
       if (again) again.focus({ preventScroll: true });
     }
-    // Opened from a "dangerous download" notification: straight to the file and its Quarantine button, once.
-    if (location.hash === '#downloads' && !state.scrolledToDownloads) {
-      state.scrolledToDownloads = true;
-      const dl = $('#downloads', slot);
-      if (dl) dl.scrollIntoView({ block: 'start' });
-    }
-    // Opened from an exposure notification: straight to the sites and what to do, once.
-    if (location.hash === '#exposures' && !state.scrolledToExposures) {
-      state.scrolledToExposures = true;
-      const ex = $('#exposures', slot);
-      if (ex) ex.scrollIntoView({ block: 'start' });
+    // Opened from a notification (a dangerous download, an exposure, a swapped wallet address): straight to its part, once.
+    for (const id of ['downloads', 'exposures', 'defense']) {
+      if (location.hash !== `#${id}` || state[`scrolledTo${id}`]) continue;
+      state[`scrolledTo${id}`] = true;
+      const part = $(`#${id}`, slot);
+      if (part) part.scrollIntoView({ block: 'start' });
     }
     bindChatSafety(slot);
     bindExposures(slot);
+    bindMySites(slot);
     bindTextSafety(slot);
     const defEl = $('[data-defense]', slot);
     if (defEl && !defEl.disabled) defEl.addEventListener('change', async (ev) => {
@@ -2205,6 +2394,13 @@
         await desktop.setClipboardCheck(clip.checked);
         toast(clip.checked ? 'Check links I copy is on. Copy a link and Sentinel checks it.' : 'Check links I copy is off.', 'success');
       } catch (err) { clip.checked = !clip.checked; toast(desktopError(err), 'error'); }
+    });
+    const walletSwitch = $('[data-wallet-guard]', slot);
+    if (walletSwitch) walletSwitch.addEventListener('change', async () => {
+      try {
+        await desktop.setWalletGuard(walletSwitch.checked);
+        toast(walletSwitch.checked ? 'Wallet guard is on.' : 'Wallet guard is off.', 'success');
+      } catch (err) { walletSwitch.checked = !walletSwitch.checked; toast(desktopError(err), 'error'); }
     });
     const shieldSwitch = $('[data-shield]', slot);
     if (shieldSwitch) shieldSwitch.addEventListener('change', async () => {
