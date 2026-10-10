@@ -1275,6 +1275,14 @@
     ['dragenter', 'dragover'].forEach((t) => drop.addEventListener(t, (ev) => { ev.preventDefault(); drop.classList.add('is-over'); }));
     ['dragleave', 'drop'].forEach((t) => drop.addEventListener(t, (ev) => { ev.preventDefault(); drop.classList.remove('is-over'); }));
     drop.addEventListener('drop', (ev) => scanFile(ev.dataTransfer.files[0]));
+    // A file chosen with "Scan with Sentinel" in the Windows right-click menu, handed over once by the app.
+    if (desktop && desktop.takeMenuFile) desktop.takeMenuFile().then((m) => {
+      if (!m || !el.isConnected) return;
+      if (!m.data) { toast(`${m.name} is too big. Files up to 25 MB can be scanned.`, 'error'); return; }
+      scanFile(new File([m.data], m.name));
+      // The answer is what the person came for: below the drop zone it was out of sight.
+      out.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+    },() => toast('That file could not be opened. Drop it here instead.', 'error'));
   }
 
   /* ========================================================= email scan */
@@ -1301,8 +1309,12 @@
           : 'Screenshots are read on your own computer by the Sentinel app for Windows, so they never have to be uploaded. <a class="u-gold" href="/download">Get the app</a>'}</p>
       </div>
       <form class="panel" data-paste data-draft="email-paste" hidden>
-        <div class="field"><label for="e-raw">Paste the whole email, headers and all</label><textarea class="textarea" id="e-raw" name="raw" rows="10" placeholder="From: PayPal Security <alerts@example.com>&#10;Subject: Your account is limited&#10;&#10;Dear customer, ..."></textarea><span class="field__hint">Sentinel picks out the sender, reply-to, subject and links, then fills the form for you to check.</span></div>
-        <div class="report__foot"><span></span><button class="btn btn--gold" type="button" data-parse>Read this email</button></div>
+        <div class="field"><label for="e-raw">Paste the whole email, headers and all</label><textarea class="textarea" id="e-raw" name="raw" rows="10" placeholder="From: PayPal Security <alerts@example.com>&#10;Subject: Your account is limited&#10;&#10;Dear customer, ..."></textarea><span class="field__hint">Sentinel picks out the sender, reply-to, subject and links, then fills the form for you to check. With its headers, it also shows who really sent it.</span></div>
+        <div data-header-help>
+          <p class="field__hint"><b>Gmail:</b> open the email, click the three dots, choose Show original, then Copy to clipboard.</p>
+          <p class="field__hint"><b>Outlook:</b> open the email, click the three dots, choose View, then View message source, and copy it all.</p>
+        </div>
+        <div class="report__foot"><span><button class="btn" type="button" data-eml-open>Open an .eml file</button><input type="file" accept=".eml,message/rfc822" data-eml hidden></span><button class="btn btn--gold" type="button" data-parse>Read this email</button></div>
       </form>
       <form class="panel" data-form data-draft="email-scan">
         <div data-email-qr></div>
@@ -1332,8 +1344,12 @@
       // Pasting a whole email starts another one: a code from an earlier screenshot does not go with it.
       if (!pasteBox.hidden) { forgetShotQr(); $('textarea', pasteBox).focus(); }
     }));
+    // The sender-check headers of the email last pasted or opened, sent with its scan while its From is unchanged.
+    // Not kept in the draft.
+    let pasted = { from: '', headers: '' };
     const fill = (raw) => {
       const m = parseEmail(raw);
+      pasted = { from: m.from, headers: m.headers };
       form.from.value = m.from; form.replyTo.value = m.replyTo; form.subject.value = m.subject; form.body.value = m.body; form.attachments.value = m.attachments.join(', ');
       $$('[data-emode]', el).forEach((x) => x.setAttribute('aria-selected', String(x.dataset.emode === 'fields')));
       pasteBox.hidden = true;
@@ -1347,6 +1363,21 @@
       const raw = $('textarea', pasteBox).value;
       if (raw.trim()) fill(raw);
     });
+    // An .eml file (saved from Outlook or Thunderbird, or dragged out of one), read here as text like a paste.
+    const emlInput = $('[data-eml]', el);
+    const readEml = async (file) => {
+      if (!file) return;
+      if (!/\.eml$/i.test(file.name) && file.type !== 'message/rfc822') { toast('Choose an email saved as an .eml file.', 'error'); return; }
+      if (file.size > 10 * 1024 * 1024) { toast('That email is too large to read here.', 'error'); return; }
+      const raw = await file.text();
+      $('textarea', pasteBox).value = raw;
+      fill(raw);
+    };
+    $('[data-eml-open]', el).addEventListener('click', () => emlInput.click());
+    emlInput.addEventListener('change', () => { readEml(emlInput.files[0]); emlInput.value = ''; });
+    const rawBox = $('textarea', pasteBox);
+    rawBox.addEventListener('dragover', (ev) => { if ([...ev.dataTransfer.types].includes('Files')) ev.preventDefault(); });
+    rawBox.addEventListener('drop', (ev) => { if (ev.dataTransfer.files.length) { ev.preventDefault(); readEml(ev.dataTransfer.files[0]); } });
 
     // A screenshot: cut into slices the recogniser can take (it has a maximum size), read on this computer, and
     // put through the same reading as a pasted email.
@@ -1412,7 +1443,8 @@
       const links = [...new Set(found)].map((href) => ({ href, text: '' }));
       const payload = {
         from: form.from.value, replyTo: form.replyTo.value, subject: form.subject.value, body,
-        links, attachments: form.attachments.value.split(',').map((s) => s.trim()).filter(Boolean), qr: shotQr
+        links, attachments: form.attachments.value.split(',').map((s) => s.trim()).filter(Boolean), qr: shotQr,
+        headers: pasted.headers && form.from.value === pasted.from ? pasted.headers : ''
       };
       out.innerHTML = stagesView(true);
       const stop = runStages(out, true);
@@ -1421,6 +1453,7 @@
         stop();
         applyUsage(data.usage);
         showVerdict(out, data.verdict);
+        showProof(out, data.verdict.sender);
         showMarks(out, payload, data.verdict.checklist.items);
         // Scanned with this email. The next email typed in here is another one, without this screenshot's code.
         forgetShotQr();
@@ -1458,6 +1491,7 @@
     E27: ['Web page attached', 'A web page sent as a file, often a sign-in page made to catch your password.'],
     E28: ['Paid tasks offer', 'Promises daily pay for simple tasks. It ends with you paying to get "earnings" out.'],
     E29: ['Voicemail lure', 'A voicemail you can only hear through a link, which leads to a sign-in page.'],
+    E31: ['Not really from here', 'The email\'s own headers show it was not sent by the address in From. Anyone can write any address there.'],
     'EL-scam': ['Scam link', 'Sentinel checked where this link goes, and it looks like a scam.'],
     'EL-malware': ['Malware link', 'Sentinel checked where this link goes, and it leads to malware.'],
     'EL-virus': ['Virus download', 'Sentinel checked where this link goes, and it downloads a virus.']
@@ -1467,6 +1501,13 @@
    * The email as it was scanned, inside the result, with each finding marked where it is (the server says where, by
    * offsets into each field) and labelled. Tapping a mark says why. Shown only when something was found.
    */
+  // Who really sent it, when the email was pasted with its headers (server/lib/scan/sender.js): one line, in words.
+  function showProof(out, sender) {
+    const checklist = $('.result__checklist', out);
+    if (!sender || !sender.proof || !checklist) return;
+    checklist.before(h(`<section class="sender-proof" data-sender-proof data-proof="${esc(sender.proof.status)}"><span class="sender-proof__k">Who sent it</span><b>${esc(sender.proof.text)}</b></section>`));
+  }
+
   function showMarks(out, mail, items) {
     const found = items.filter((c) => (c.status === 'fail' || c.status === 'warn') && c.marks && c.marks.length);
     const checklist = $('.result__checklist', out);
@@ -1524,7 +1565,7 @@
     const canRead = Boolean(desktop && desktop.readScreenshot);
     const allowance = () => `${scanLeftText('fast')}. A text counts as one fast link scan, on every plan: its links are checked by their address only, not researched like a pasted email. Nothing is stored.`;
     el.innerHTML = `
-      ${title('Text scan', 'Got a text, a WhatsApp message or a DM you are not sure about? Paste it in, or a screenshot of it, and Sentinel says if it looks like a scam and what to do.',
+      ${title('Text scan', 'Got a text, a WhatsApp message or a DM you are not sure about? Paste it in, or a screenshot of it, and Sentinel says if it looks like a scam and what to do. A whole conversation works too: Sentinel shows if it follows the steps of a slow scam.',
         '<div class="segmented" role="tablist"><button role="tab" data-tmode="paste" aria-selected="true">Paste the text</button><button role="tab" data-tmode="shot" aria-selected="false">Screenshot</button></div>')}
       <div class="panel" data-shot hidden>
         <label class="drop" data-shot-drop>
@@ -1533,12 +1574,12 @@
         </label>
         <figure class="shot" data-shot-preview hidden><img alt="The screenshot to read"><figcaption data-shot-status></figcaption></figure>
         <p class="field__hint u-mt-sm">${canRead
-          ? 'Read on this computer by Windows. The image is not uploaded or kept. If you replied in the conversation, crop the screenshot to the message you were sent.'
+          ? 'Read on this computer by Windows. The image is not uploaded or kept. A screenshot of a whole conversation works too.'
           : 'Screenshots are read on your own computer by the Sentinel app for Windows, so they never have to be uploaded. <a class="u-gold" href="/download">Get the app</a>, or paste the text instead.'}</p>
       </div>
       <form class="panel" data-form>
         <div class="field"><label for="t-from">From <span class="opt">(optional: the number, short code or name the message shows)</span></label><input class="input" id="t-from" name="from" placeholder="+1 415 555 0199" autocomplete="off" maxlength="80"></div>
-        <div class="field"><label for="t-text">Message</label><textarea class="textarea" id="t-text" name="text" rows="6" maxlength="2000" placeholder="Paste the message, including any links"></textarea></div>
+        <div class="field"><label for="t-text">Message or conversation</label><textarea class="textarea" id="t-text" name="text" rows="6" maxlength="8000" placeholder="Paste the message, or the whole conversation, including any links"></textarea></div>
         <div class="report__foot">
           <span class="muted" data-left>${esc(allowance())}</span>
           <button class="btn btn--gold" type="submit">Check this text</button>
@@ -1624,8 +1665,8 @@
     const who = !from ? 'No sender given' : `From ${from}${r.sender === 'number' ? ', a phone number' : r.sender === 'shortcode' ? ', a business short code' : r.sender === 'email' ? ', an email address' : ''}`;
     const linkLine = (l) => `${l.host || l.url}: ${l.badge ? `${l.label}${l.reason ? `. ${l.reason}` : ''}` : l.label === 'Not checked' ? 'could not be checked just now' : 'no threat found'}`;
     const reasons = [...(f ? [[f.detail, tone]] : []), ...r.links.map((l) => [linkLine(l), l.badge])];
-    // Family on a "new number" wants money sent; the rest want a card number or a sign-in.
-    const happened = f && /family/i.test(f.title) ? 'bank' : 'card,password';
+    // Family on a "new number" and slow scams want money sent; the rest want a card number or a sign-in.
+    const happened = f && (/family/i.test(f.title) || r.conversation) ? 'bank' : 'card,password';
     const scam = f && (f.level === 'danger' || red);
     const steps = f ? [f.advice] : [`Nothing in this text matches the scams Sentinel knows${r.links.length ? ', and its links are on no threat list' : ''}.`, 'Still unsure? Contact the company or person through their own app, website or a number you already have, not the one in the text.'];
     return `<article class="result result--${tone}" data-result data-text-result="${tone}">
@@ -1638,9 +1679,20 @@
       </header>
       <div class="next-steps next-steps--${tone}"><h3>${f ? 'What to do now' : 'Good to know'}</h3><ol>${steps.map((s) => `<li>${esc(s)}</li>`).join('')}</ol>
         ${scam ? `<p class="next-steps__more">Already tapped the link, paid or replied? <a href="/app/recover?happened=${happened}">Open the recovery guide</a> for every step, in order.</p>` : ''}</div>
+      ${r.conversation ? slowSteps(r.conversation) : ''}
       ${reasons.length ? `<div class="reasons"><h3>Why</h3><ul>${reasons.map(([t, badge]) => `<li><span class="dot" style="--c:${color(badge || null)}"></span>${esc(t)}</li>`).join('')}</ul></div>` : ''}
       <div class="notes"><p>${r.links.length ? 'Links were checked by their address only and were not opened. ' : ''}The text was checked in memory and not kept, and it is not in your history.</p></div>
     </article>${scam && canWarn(tone) ? warnRow() : ''}`;
+  }
+
+  /** Where a conversation is on the path of a slow scam (server/lib/scan/slowscam.js), and what usually comes next. */
+  function slowSteps(c) {
+    return `<div class="slow slow--${c.level === 'danger' ? 'orange' : 'yellow'}" data-slow="${esc(c.at)}">
+      <h3>Where this conversation is</h3>
+      <ol class="slow__steps">${c.stages.map((s, i) => `<li class="slow__step${s.seen ? ' is-seen' : ''}${s.id === c.at ? ' is-at' : ''}" style="--i:${i}"${s.id === c.at ? ' aria-current="step"' : ''}>
+        <span class="slow__dot" aria-hidden="true"></span><span>${esc(s.label)}</span><span class="slow__sr">${s.seen ? ' (seen in this conversation)' : ''}</span></li>`).join('')}</ol>
+      <p class="slow__next"><b>What usually comes next.</b> ${esc(c.next)}</p>
+    </div>`;
   }
 
   /** PNG slices of an image, at most 2000 wide and 1600 tall, overlapping by 60 so no line is cut in half. */
@@ -1685,22 +1737,79 @@
 
   /** Pull the useful parts out of a pasted email: headers first, then the body. */
   function parseEmail(raw) {
-    const text = raw.replace(/\r\n?/g, '\n');
-    const out = { from: '', replyTo: '', subject: '', body: text, attachments: [] };
+    let text = raw.replace(/\r\n?/g, '\n');
+    const out = { from: '', replyTo: '', subject: '', body: text, attachments: [], headers: '' };
+    // Gmail's Show original page, copied whole, starts with a summary: the message itself is the block with the
+    // headers a mail service writes.
+    const delivered = text.search(/^(Received|Authentication-Results|Received-SPF|DKIM-Signature|Return-Path|Delivered-To)[ \t]*:/im);
+    if (delivered > 0 && /\n\s*\n/.test(text.slice(0, delivered))) text = text.slice(text.lastIndexOf('\n', delivered - 1) + 1);
     const headerEnd = text.search(/\n\s*\n/);
     const headBlock = headerEnd > 0 ? text.slice(0, headerEnd) : text.slice(0, 1200);
-    const header = (name) => {
-      const m = headBlock.match(new RegExp(`^${name}\\s*:\\s*(.+(?:\\n[ \\t]+.+)*)`, 'im'));
-      return m ? m[1].replace(/\n[ \t]+/g, ' ').trim() : '';
+    const header = (name, block = headBlock) => {
+      const m = block.match(new RegExp(`^${name}\\s*:\\s*(.+(?:\\n[ \\t]+.+)*)`, 'im'));
+      return m ? words(m[1].replace(/\n[ \t]+/g, ' ').trim()) : '';
     };
     out.from = header('From') || header('Sender');
     out.replyTo = header('Reply-To');
     out.subject = header('Subject');
-    if (out.from || out.subject) out.body = headerEnd > 0 ? text.slice(headerEnd).trim() : text;
+    // Only the headers that say who really sent it go with the scan: not the route it took, with its addresses.
+    out.headers = (headBlock.match(/^(Authentication-Results|Received-SPF|DKIM-Signature|Return-Path)[ \t]*:.*(\n[ \t]+.*)*/gim) || []).join('\n');
+    if (out.from || out.subject) out.body = headerEnd > 0 ? (readable(headBlock, text.slice(headerEnd).replace(/^\s*\n/, '')) ?? text.slice(headerEnd)).trim() : text;
     // Gmail / Outlook "printed" emails put attachments at the end as bare file names.
     const files = text.match(/\b[\w][\w .()-]{0,80}\.(pdf|exe|zip|rar|7z|docm?|xlsm?|xlsx|pptx?|js|vbs|scr|iso|img|html?|lnk|msi|bat|cmd|apk|dmg)\b/gi) || [];
     out.attachments = [...new Set(files.map((f) => f.trim()))].filter((f) => !/^https?:/i.test(f)).slice(0, 10);
     return out;
+  }
+
+  /** Bytes as text in the part's character set (UTF-8 when it names none this browser knows). */
+  function decodeBytes(bytes, charset) {
+    try { return new TextDecoder(charset || 'utf-8').decode(bytes); } catch { return new TextDecoder().decode(bytes); }
+  }
+  /** A header's encoded words ("=?UTF-8?B?UGF5UGFs?=") as the words they are. */
+  function words(s) {
+    return s.replace(/\?=\s+=\?/g, '?==?').replace(/=\?([^?]+)\?([BQ])\?([^?]*)\?=/gi, (all, charset, how, data) => {
+      try { return decodeBytes(how.toUpperCase() === 'B' ? Uint8Array.from(atob(data), (c) => c.charCodeAt(0)) : qp(data.replace(/_/g, ' ')), charset); } catch { return all; }
+    });
+  }
+  function qp(s) {
+    const bytes = [];
+    for (let i = 0; i < s.length; i++) {
+      if (s[i] === '=' && /^[0-9A-F]{2}$/i.test(s.substr(i + 1, 2))) { bytes.push(parseInt(s.substr(i + 1, 2), 16)); i += 2; } else bytes.push(s.charCodeAt(i) & 255);
+    }
+    return Uint8Array.from(bytes);
+  }
+  /**
+   * The readable text of a raw message (an .eml file, or Show original): its plain text part, else its web page part
+   * as text with each link written "words <address>", decoded. Null when the message is not in parts or encoded.
+   * The page part is only parsed, never shown or loaded.
+   */
+  function readable(head, body, depth = 0) {
+    const field = (name) => { const m = head.match(new RegExp(`^${name}\\s*:\\s*(.+(?:\\n[ \\t]+.+)*)`, 'im')); return m ? m[1].replace(/\n[ \t]+/g, ' ') : ''; };
+    const type = field('Content-Type');
+    const enc = field('Content-Transfer-Encoding').trim().toLowerCase();
+    const boundary = /boundary\s*=\s*"?([^";]+)"?/i.exec(type);
+    if (/^\s*multipart\//i.test(type) && boundary && depth < 5) {
+      const parts = body.split(`--${boundary[1].trim()}`).slice(1).filter((p) => !p.startsWith('--')).map((p) => {
+        const s = p.replace(/^[ \t]*\n/, '');
+        const end = s.search(/\n\s*\n/);
+        return end < 0 ? null : { head: s.slice(0, end), body: s.slice(end).replace(/^\s*\n/, '') };
+      }).filter(Boolean);
+      const pick = parts.find((p) => /^content-type\s*:\s*text\/plain/im.test(p.head)) || parts.find((p) => /^content-type\s*:\s*(text\/html|multipart\/)/im.test(p.head));
+      return pick ? readable(pick.head, pick.body, depth + 1) : null;
+    }
+    if (!type && !enc) return null;
+    const charset = (/charset\s*=\s*"?([^";\s]+)/i.exec(type) || [])[1];
+    let textOut = body;
+    try {
+      if (enc === 'base64') textOut = decodeBytes(Uint8Array.from(atob(body.replace(/[^A-Za-z0-9+/=]/g, '')), (c) => c.charCodeAt(0)), charset);
+      else if (enc === 'quoted-printable') textOut = decodeBytes(qp(body.replace(/=\n/g, '')), charset);
+    } catch { return null; }
+    if (!/^\s*text\/html/i.test(type)) return textOut;
+    const doc = new DOMParser().parseFromString(textOut, 'text/html');
+    doc.querySelectorAll('script, style').forEach((n) => n.remove());
+    doc.querySelectorAll('a[href]').forEach((a) => a.replaceWith(`${a.textContent.trim()} <${a.getAttribute('href')}> `));
+    doc.querySelectorAll('br, p, div, tr, li, h1, h2, h3').forEach((n) => n.append('\n'));
+    return doc.body ? doc.body.textContent.replace(/[ \t ]+/g, ' ').replace(/\n\s*\n\s*/g, '\n\n').trim() : null;
   }
 
   /* ============================================================ history */
@@ -1847,6 +1956,8 @@
       const ticked = (name) => $$(`input[name="${name}"]:checked`, form).map((i) => i.value);
       const r = C.judge(ticked('ask'), ticked('who'));
       out.dataset.verdict = r ? r.verdict : '';
+      // In the Windows app, only that the answer was "Hang up" goes to the app (an hour's pay pause sign, paypause.js).
+      if (r && r.verdict === 'hangup' && window.sentinelDesktop && window.sentinelDesktop.callHangUp) window.sentinelDesktop.callHangUp().catch(() => {});
       out.innerHTML = !r ? '<p class="call__empty">Tick what the caller says, and the answer appears here.</p>'
         : `<p class="call__verdict">${r.verdict === 'hangup' ? 'Hang up now.' : 'This is probably fine.'}</p>
           <p class="call__reason">${esc(r.reason)}</p>
@@ -2513,6 +2624,7 @@
             <input class="switch" type="checkbox" data-snip aria-label="Check something on screen" ${info.snip.enabled ? 'checked' : ''}></div>` : ''}
           ${desktop.setRemoteGuard && info.remoteGuard && info.remoteGuard.supported ? `<label class="setting"><div><b>Tech-support scam shield</b>${info.remoteGuard.enabled && !live.enabled ? '<span class="status is-locked">Needs live scanning</span>' : ''}<span>When a page flagged as a scam takes the whole screen, Sentinel offers to close it. When a remote-control program such as AnyDesk or TeamViewer starts soon after a flagged page, or soon after it was downloaded, Sentinel asks whether someone on the phone told you to install it. Nothing is stopped unless you say so. The way out of a full-screen page and the bank warning work while live scanning is on.${info.remoteGuard.trusted.length ? ` You use ${esc(info.remoteGuard.trusted.join(', '))} yourself.` : ''}</span></div><input class="switch" type="checkbox" data-remote-guard ${info.remoteGuard.enabled ? 'checked' : ''}></label>
           ${info.remoteGuard.trusted.length ? '<div class="setting"><div><b>Programs you use yourself</b><span>Sentinel does not ask about these.</span></div><button class="btn btn--sm" data-forget-remote>Ask again</button></div>' : ''}` : ''}
+          ${desktop.setScanMenu && info.scanMenu && info.scanMenu.supported ? `<label class="setting"><div><b>Scan with Sentinel in the right-click menu</b><span>Right-click any file, choose Show more options, then Scan with Sentinel. The file is checked on this computer and the answer opens here.</span></div><input class="switch" type="checkbox" data-scan-menu ${info.scanMenu.enabled ? 'checked' : ''}></label>` : ''}
           <label class="setting"><div><b>Start with my computer</b><span>Keep protection running from the moment you sign in.</span></div><input class="switch" type="checkbox" data-login ${info.openAtLogin ? 'checked' : ''}></label>
           <div class="setting"><div><b>Sentinel ${esc(info.version)}</b><span>${esc(updateText(up))}</span></div>
             ${up.status === 'ready' ? '<button class="btn btn--sm btn--gold" data-install-update>Restart now</button>'
@@ -2658,6 +2770,13 @@
     });
     $('[data-login]', slot).addEventListener('change', async (ev) => {
       try { await desktop.setOpenAtLogin(ev.target.checked); } catch (err) { ev.target.checked = !ev.target.checked; toast(desktopError(err), 'error'); }
+    });
+    const scanMenu = $('[data-scan-menu]', slot);
+    if (scanMenu) scanMenu.addEventListener('change', async () => {
+      try {
+        await desktop.setScanMenu(scanMenu.checked);
+        toast(scanMenu.checked ? 'Scan with Sentinel is in the right-click menu.' : 'Scan with Sentinel is out of the right-click menu.', 'success');
+      } catch (err) { scanMenu.checked = !scanMenu.checked; toast(desktopError(err), 'error'); }
     });
     const clip = $('[data-clip]', slot);
     if (clip) clip.addEventListener('change', async () => {
