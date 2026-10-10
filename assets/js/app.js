@@ -168,6 +168,7 @@
     '/app/threats': ['threats', threatsView],
     '/app/email': ['email', emailView],
     '/app/text': ['text', textView],
+    '/app/call': ['call', callView],
     '/app/history': ['history', historyView],
     '/app/protection': ['protection', protectionView],
     '/app/download': ['protection', protectionView],
@@ -199,7 +200,7 @@
     fn(el, new URLSearchParams(location.search));
     // Every view draws its forms synchronously before it waits on anything, so what was typed can go back in now.
     restoreDrafts();
-    document.title = `${{ home: 'Overview', week: 'Your week', scan: 'Link scan', threats: 'Virus & malware', email: 'Email scan', text: 'Text scan', history: 'History', protection: 'Live protection', plan: 'Plan & usage', security: 'Security', assistants: 'AI assistants', sites: 'Site rules', checkup: 'Browser checkup', recover: 'Recovery guide' }[name]} · Sentinel`;
+    document.title = `${{ home: 'Overview', week: 'Your week', scan: 'Link scan', threats: 'Virus & malware', email: 'Email scan', text: 'Text scan', call: 'Is this call a scam?', history: 'History', protection: 'Live protection', plan: 'Plan & usage', security: 'Security', assistants: 'AI assistants', sites: 'Site rules', checkup: 'Browser checkup', recover: 'Recovery guide' }[name]} · Sentinel`;
   }
 
   /** Render a verdict with its checklist tools and follow-up actions. */
@@ -230,7 +231,7 @@
 
   const PAGES = [
     ['Overview', '/app', 'home'], ['Your week', '/app/week', 'week'], ['Link scan', '/app/scan', 'scan'], ['Virus & malware scan', '/app/threats', 'threats'],
-    ['Email scan', '/app/email', 'email'], ['Text scan', '/app/text', 'text'], ['History', '/app/history', 'history'], ['Site rules', '/app/sites', 'sites'], ['Browser checkup', '/app/checkup', 'checkup'],
+    ['Email scan', '/app/email', 'email'], ['Text scan', '/app/text', 'text'], ['Is this call a scam?', '/app/call', 'call'], ['History', '/app/history', 'history'], ['Site rules', '/app/sites', 'sites'], ['Browser checkup', '/app/checkup', 'checkup'],
     ['Live protection', '/app/protection', 'protection'], ['Plan & usage', '/app/plan', 'plan'], ['Security', '/app/security', 'security'],
     ['AI assistants', '/app/assistants', 'assistants'], ['Recovery guide', '/app/recover', 'recover']
   ];
@@ -989,7 +990,8 @@
   async function explainQr(out, text, { focus = false } = {}) {
     try {
       const { qr } = await api('/scan/qr', { method: 'POST', body: { text: window.SentinelQR.redact(text) } });
-      out.innerHTML = qrCard(qr);
+      out.innerHTML = qrCard(qr) + (canWarn(qr.tone) ? warnRow() : '');
+      wireWarn(out, () => window.SentinelWarnCard.fromQr(qr));
       // Read from a picture, the result is somewhere new on the page: keyboard and screen reader users are taken to it.
       const heading = focus && $('h2', out);
       if (heading) { heading.tabIndex = -1; heading.focus({ preventScroll: false }); }
@@ -1092,7 +1094,7 @@
   ];
 
   function actionsFor(v) {
-    const copy = '<button class="btn btn--sm" data-copy-report>Copy report</button>';
+    const copy = `<button class="btn btn--sm" data-copy-report>Copy report</button>${v.kind !== 'file' && canWarn(window.UI.headline(v).tone) ? WARN_BTN : ''}`;
     if (v.kind !== 'url') return `<div class="panel actions"><span class="muted">Share what Sentinel found.</span><span class="actions__btns">${copy}</span></div>`;
     const trusted = v.override === 'allow';
     const blocked = v.override === 'block';
@@ -1115,6 +1117,7 @@
   }
 
   function wireActions(root, v) {
+    wireWarn(root, () => window.SentinelWarnCard.fromVerdict(v, window.UI.headline(v)));
     const report = $('[data-act="report"]', root);
     const form = $('[data-report-form]', root);
     if (report) report.addEventListener('click', () => {
@@ -1147,6 +1150,61 @@
         window.UI.wireCopy(root, v);
       } catch (err) { toast(err.message, 'error'); }
     })));
+  }
+
+  /* ======================================================= warn a friend */
+
+  // A picture of a scam that was found, for someone who may get the same one: drawn on this device (warncard.js),
+  // with the link written so it cannot be tapped, and never uploaded. Only for a likely or confirmed scam.
+  const WARN_BTN = '<button class="btn btn--sm" type="button" data-warn aria-expanded="false">Warn a friend</button>';
+  const warnRow = () => `<div class="panel actions"><span class="muted">Someone you know might get this one too.</span><span class="actions__btns">${WARN_BTN}</span></div>`;
+  const canWarn = (tone) => tone === 'red' || tone === 'orange';
+
+  function wireWarn(root, make) {
+    const btn = $('[data-warn]', root);
+    const W = window.SentinelWarnCard;
+    if (!btn || !W) return;
+    btn.addEventListener('click', async () => {
+      const row = btn.closest('.actions');
+      const open = $('[data-warn-card]', row);
+      if (open) { open.remove(); btn.setAttribute('aria-expanded', 'false'); return; }
+      const card = make();
+      const canvas = document.createElement('canvas');
+      let blob = null;
+      try {
+        await W.draw(canvas, card);
+        blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+      } catch { /* told below */ }
+      if (!blob) { toast('The picture could not be made in this browser.', 'error'); return; }
+      const file = new File([blob], 'sentinel-scam-warning.png', { type: 'image/png' });
+      const share = Boolean(navigator.canShare && navigator.canShare({ files: [file] }));
+      const copy = Boolean(window.ClipboardItem && navigator.clipboard && navigator.clipboard.write);
+      const panel = h(`<div class="warn-card" data-warn-card>
+        <div class="warn-card__pic"></div>
+        <div class="warn-card__side">
+          <p>Send this picture to anyone who might get the same scam. The link on it is written so it cannot be tapped. The picture was made on this device and is not uploaded.</p>
+          <span class="actions__btns">
+            ${share ? '<button class="btn btn--gold btn--sm" type="button" data-warn-share>Share</button>' : ''}
+            ${copy ? '<button class="btn btn--sm" type="button" data-warn-copy>Copy picture</button>' : ''}
+            <a class="btn btn--sm" data-warn-save download="sentinel-scam-warning.png" href="${canvas.toDataURL('image/png')}">Save picture</a>
+          </span>
+        </div>
+      </div>`);
+      canvas.setAttribute('role', 'img');
+      canvas.setAttribute('aria-label', W.text(card));
+      $('.warn-card__pic', panel).appendChild(canvas);
+      const shareBtn = $('[data-warn-share]', panel);
+      if (shareBtn) shareBtn.addEventListener('click', () => navigator.share({ files: [file], text: W.text(card) }).catch((err) => {
+        if (err.name !== 'AbortError') toast('That could not be shared. Save the picture and send it instead.', 'error');
+      }));
+      const copyBtn = $('[data-warn-copy]', panel);
+      if (copyBtn) copyBtn.addEventListener('click', () => navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })])
+        .then(() => toast('Picture copied. Paste it into a message.', 'success'), () => toast('Couldn’t access the clipboard. Save the picture instead.', 'error')));
+      row.appendChild(panel);
+      btn.setAttribute('aria-expanded', 'true');
+      $('a, button', panel).focus({ preventScroll: true });
+      panel.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'nearest' });
+    });
   }
 
   /* ====================================================== virus & malware */
@@ -1363,9 +1421,97 @@
         stop();
         applyUsage(data.usage);
         showVerdict(out, data.verdict);
+        showMarks(out, payload, data.verdict.checklist.items);
         // Scanned with this email. The next email typed in here is another one, without this screenshot's code.
         forgetShotQr();
       } catch (err) { stop(); out.innerHTML = friendlyError(err); }
+    });
+  }
+
+  // What each finding is called on its mark, and why it matters, in plain words. Keyed by the check (server/lib/scan/email.js).
+  const EMAIL_MARKS = {
+    E01: ['Name is not the address', 'The name says one company, but the address it came from belongs to someone else. Anyone can type any name.'],
+    E02: ['Look-alike address', 'The address is made to look like a real company\'s, with a small change that is easy to miss.'],
+    E03: ['Replies go elsewhere', 'If you press Reply, your answer goes to a different address than the one this came from.'],
+    E04: ['Company on a free mailbox', 'A company or office writing from a free mailbox anyone can open. Real ones write from their own address.'],
+    E05: ['Rushes you', 'Words meant to hurry you, so you act before you stop to check.'],
+    E06: ['Asks for your details', 'Asks you to confirm a password, an account or card details. Real companies do not ask for these by email.'],
+    E07: ['Asks for gift cards or crypto', 'Asks to be paid in a way that cannot be undone, like gift cards, crypto or a wire transfer. This is how scammers get paid.'],
+    E08: ['Does not use your name', 'A greeting that does not use your name. Companies you deal with usually do.'],
+    E09: ['A threat', 'Threatens to close your account or take action against you, to scare you into acting.'],
+    E10: ['Link goes somewhere else', 'The words show one address, but the link opens a different one.'],
+    E11: ['Hidden link address', 'A shortened link hides where it really goes.'],
+    E12: ['QR code lure', 'Asks you to scan a code with your phone, where it is harder to see where it leads.'],
+    E13: ['A program', 'This attachment is a program. Opening it would run it on your computer.'],
+    E14: ['Hides its real type', 'The name ends like a document, but the file is something else.'],
+    E15: ['Macro document', 'A document that can run code when you open it.'],
+    E16: ['Archive with its password', 'An archive sent with its password: a way to get past virus scanners.'],
+    E17: ['Invoice lure', 'An invoice or receipt sent with a risky attachment.'],
+    E18: ['Made-up address', 'The sender\'s address is several words stitched together, often a new address made for a scam.'],
+    E19: ['Untraceable payment', 'Presents as a company or office and asks for gift cards, crypto or a wire transfer. No real one does.'],
+    E20: ['Parcel fee', 'Asks for a fee to release a parcel. Check on the courier\'s own site instead.'],
+    E21: ['Call this number', 'Asks you to phone a number about a charge or a problem. The person who answers is the scammer.'],
+    E22: ['Asks for private details', 'Asks you to send an ID, bank details or a password by reply.'],
+    E23: ['Urgent favour', 'An urgent, private favour with gift cards or a wire transfer. Check with the person another way first.'],
+    E24: ['Money for a stranger', 'Asks for money for travel, or offers a fortune you have to pay to claim.'],
+    E25: ['Toll or fine', 'Demands an unpaid toll or fine from an address that is not the agency\'s own.'],
+    E27: ['Web page attached', 'A web page sent as a file, often a sign-in page made to catch your password.'],
+    E28: ['Paid tasks offer', 'Promises daily pay for simple tasks. It ends with you paying to get "earnings" out.'],
+    E29: ['Voicemail lure', 'A voicemail you can only hear through a link, which leads to a sign-in page.'],
+    'EL-scam': ['Scam link', 'Sentinel checked where this link goes, and it looks like a scam.'],
+    'EL-malware': ['Malware link', 'Sentinel checked where this link goes, and it leads to malware.'],
+    'EL-virus': ['Virus download', 'Sentinel checked where this link goes, and it downloads a virus.']
+  };
+
+  /**
+   * The email as it was scanned, inside the result, with each finding marked where it is (the server says where, by
+   * offsets into each field) and labelled. Tapping a mark says why. Shown only when something was found.
+   */
+  function showMarks(out, mail, items) {
+    const found = items.filter((c) => (c.status === 'fail' || c.status === 'warn') && c.marks && c.marks.length);
+    const checklist = $('.result__checklist', out);
+    if (!found.length || !checklist) return;
+    const whys = [];
+    const fields = [['from', 'From', mail.from], ['replyTo', 'Reply-to', mail.replyTo], ['subject', 'Subject', mail.subject], ['attachments', 'Attachments', mail.attachments.join(', ')], ['body', 'Message', mail.body]];
+    const rows = fields.filter(([, , text]) => text).map(([key, label, text]) => {
+      // Findings in the same words become one mark that carries each of them.
+      const spans = found.flatMap((c) => c.marks.filter((m) => m.field === key && m.start >= 0 && m.end <= text.length && m.end > m.start).map((m) => ({ start: m.start, end: m.end, checks: [c] })))
+        .sort((a, b) => a.start - b.start);
+      const merged = [];
+      for (const s of spans) {
+        const last = merged[merged.length - 1];
+        if (last && s.start < last.end) {
+          last.end = Math.max(last.end, s.end);
+          if (!last.checks.includes(s.checks[0])) last.checks.push(s.checks[0]);
+        } else merged.push(s);
+      }
+      let html = '';
+      let at = 0;
+      for (const s of merged) {
+        const fail = s.checks.some((c) => c.status === 'fail');
+        whys.push({ fail, checks: s.checks });
+        html += `${esc(text.slice(at, s.start))}<mark class="emark${fail ? ' is-fail' : ''}" tabindex="0" role="button" aria-expanded="false" data-emark="${whys.length - 1}">${esc(text.slice(s.start, s.end))}<span class="emark__tag">${esc(s.checks.map((c) => (EMAIL_MARKS[c.id] || [c.title])[0]).join(', '))}</span></mark>`;
+        at = s.end;
+      }
+      return `<div class="email-marks__row" data-efield="${key}"><span class="email-marks__k">${label}</span><div class="email-marks__v${key === 'body' ? ' email-marks__body' : ''}">${html}${esc(text.slice(at))}</div></div>`;
+    });
+    const section = h(`<section class="email-marks" data-email-marks><h3>The email, marked</h3><p class="email-marks__hint">Each warning sign is marked where it is. Tap a mark to see why.</p>${rows.join('')}</section>`);
+    checklist.before(section);
+    const why = h('<div class="email-marks__why" role="status" data-emark-why></div>');
+    const toggle = (mark) => {
+      const open = mark.getAttribute('aria-expanded') !== 'true';
+      $$('[data-emark]', section).forEach((m) => m.setAttribute('aria-expanded', 'false'));
+      if (!open) { why.remove(); return; }
+      const w = whys[Number(mark.dataset.emark)];
+      mark.setAttribute('aria-expanded', 'true');
+      why.classList.toggle('is-fail', w.fail);
+      why.innerHTML = w.checks.map((c) => { const [label, text] = EMAIL_MARKS[c.id] || [c.title, '']; return `<b>${esc(label)}</b>${text ? `<p>${esc(text)}</p>` : ''}<small>${esc(c.detail)}</small>`; }).join('');
+      mark.closest('[data-efield]').after(why);
+    };
+    section.addEventListener('click', (ev) => { const m = ev.target.closest('[data-emark]'); if (m) toggle(m); });
+    section.addEventListener('keydown', (ev) => {
+      const m = ev.target.closest('[data-emark]');
+      if (m && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); toggle(m); }
     });
   }
 
@@ -1463,6 +1609,8 @@
         applyUsage(data.usage);
         $('[data-left]', el).textContent = allowance();
         out.innerHTML = textResult(data.text, form.from.value.trim());
+        const from = form.from.value.trim();
+        wireWarn(out, () => window.SentinelWarnCard.fromText(data.text, from, $('[data-text-result]', out).dataset.textResult));
         out.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
       } catch (err) { out.innerHTML = friendlyError(err); }
     });
@@ -1492,7 +1640,7 @@
         ${scam ? `<p class="next-steps__more">Already tapped the link, paid or replied? <a href="/app/recover?happened=${happened}">Open the recovery guide</a> for every step, in order.</p>` : ''}</div>
       ${reasons.length ? `<div class="reasons"><h3>Why</h3><ul>${reasons.map(([t, badge]) => `<li><span class="dot" style="--c:${color(badge || null)}"></span>${esc(t)}</li>`).join('')}</ul></div>` : ''}
       <div class="notes"><p>${r.links.length ? 'Links were checked by their address only and were not opened. ' : ''}The text was checked in memory and not kept, and it is not in your history.</p></div>
-    </article>`;
+    </article>${scam && canWarn(tone) ? warnRow() : ''}`;
   }
 
   /** PNG slices of an image, at most 2000 wide and 1600 tall, overlapping by 60 so no line is cut in half. */
@@ -1671,6 +1819,45 @@
   }
 
   /* ====================================================== browser checkup */
+
+  /* ========================================================== call check */
+
+  // "Is this call a scam?" for while someone is on the phone. The answer is worked out here, by callcheck.js, from what
+  // is ticked; nothing is sent or kept, so leaving the page forgets the call.
+  function callView(el) {
+    const C = window.SentinelCallCheck;
+    const picks = (list, name) => list.map((x) => `<label class="call__pick"><input type="checkbox" name="${name}" value="${x.id}"><span>${esc(x.label)}</span></label>`).join('');
+    el.innerHTML = `
+      ${title('Is this call a scam?', 'On the phone right now? Tick what the caller is saying. Sentinel answers at once, on this device. Nothing you tick is sent anywhere or kept.')}
+      <form class="call" data-call>
+        <fieldset class="panel call__group">
+          <legend><h2>What are they asking for or saying?</h2><span>Tick everything that fits.</span></legend>
+          <div class="call__picks">${picks(C.ASKS, 'ask')}</div>
+        </fieldset>
+        <fieldset class="panel call__group">
+          <legend><h2>Who do they say they are?</h2></legend>
+          <div class="call__picks">${picks(C.WHO, 'who')}</div>
+        </fieldset>
+        <div class="call__answer" data-call-answer aria-live="polite"></div>
+        <button type="reset" class="btn btn--ghost btn--sm">Start over</button>
+      </form>`;
+    const form = $('[data-call]', el);
+    const out = $('[data-call-answer]', el);
+    const draw = () => {
+      const ticked = (name) => $$(`input[name="${name}"]:checked`, form).map((i) => i.value);
+      const r = C.judge(ticked('ask'), ticked('who'));
+      out.dataset.verdict = r ? r.verdict : '';
+      out.innerHTML = !r ? '<p class="call__empty">Tick what the caller says, and the answer appears here.</p>'
+        : `<p class="call__verdict">${r.verdict === 'hangup' ? 'Hang up now.' : 'This is probably fine.'}</p>
+          <p class="call__reason">${esc(r.reason)}</p>
+          <p class="call__next"><b>What to do next:</b> ${esc(r.next)}</p>
+          ${r.happened.length ? `<p class="call__more">Already did what they asked? <a href="/app/recover?happened=${r.happened.join(',')}">Open the recovery guide</a> for every step, in order.</p>` : ''}`;
+    };
+    form.addEventListener('change', draw);
+    form.addEventListener('reset', () => setTimeout(draw));
+    form.addEventListener('submit', (ev) => ev.preventDefault());
+    draw();
+  }
 
   /* ====================================================== recovery guide */
 

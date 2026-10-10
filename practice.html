@@ -27,10 +27,11 @@
 <meta name="twitter:card" content="summary_large_image">
 
 <link rel="stylesheet" href="assets/css/lux.css">
-<title>Recovery guide · Sentinel</title>
-<meta name="description" content="Think you have been scammed? Tick what happened and get one ordered checklist of what to do, starting now, and where to report it.">
-<meta property="og:url" content="https://wyattbombara.github.io/sentinel/recover">
-<link rel="canonical" href="https://wyattbombara.github.io/sentinel/recover">
+<link rel="stylesheet" href="assets/css/practice.css">
+<title>Spot the scam: a practice inbox · Sentinel</title>
+<meta name="description" content="Twelve made-up messages, some scams and some real. Sort each one, then see the clues that give it away, marked in the message. No account needed.">
+<meta property="og:url" content="https://wyattbombara.github.io/sentinel/practice">
+<link rel="canonical" href="https://wyattbombara.github.io/sentinel/practice">
 </head>
 <body class="has-prelaunch">
 <a class="skip-link" href="#main">Skip to content</a>
@@ -64,41 +65,24 @@
 
 <main id="main">
 <div class="prelaunch" role="status"><b>Preview.</b> Sentinel hasn&rsquo;t launched yet, so accounts and downloads aren&rsquo;t available here, and Try a link checks addresses in your browser. Everything else is the real product: the verdicts on this page come from Sentinel&rsquo;s own engine.</div>
-  <section class="page-head page-head--recover">
+  <section class="page-head page-head--practice">
     <div class="wrap-narrow">
       <svg class="orn-rule" viewBox="0 0 260 26" aria-hidden="true"><path d="M0 13h100M160 13h100"/><path d="M130 3l10 10-10 10-10-10z"/><path d="M120 13c-6-9-16-9-20 0 4 9 14 9 20 0M140 13c6-9 16-9 20 0-4 9-14 9-20 0"/><circle cx="130" cy="13" r="2"/></svg>
-      <span class="kicker" data-reveal>Recovery guide</span>
-      <h1 data-split>I think I&rsquo;ve been scammed</h1>
-      <p data-reveal>Take a breath. Tick what happened, and Sentinel puts what to do in order, most urgent first. Nothing you tick leaves this browser.</p>
+      <span class="kicker" data-reveal>Practice</span>
+      <h1 data-split>Spot the scam</h1>
+      <p data-reveal>Twelve messages: emails, texts and a couple of Discord messages. Some are scams and some are real. Sort each one, then see the clues that give it away. Every message is made up, and your answers stay in this page.</p>
     </div>
   </section>
 
   <section class="prose-wrap">
-    <div class="wrap-narrow recover" data-recover>
-      <noscript>
-        <div class="prose">
-          <h2>What to do now</h2>
-          <ol>
-            <li>Stop all contact. Do not reply, call back or pay anything more.</li>
-            <li>Gave card or bank details, or sent money? Call your bank using the number on your card, and ask them to block the card or stop the payment.</li>
-            <li>Typed a password into a fake site? Change it on the real site, and anywhere else you use it.</li>
-            <li>Let someone connect to your computer? Disconnect from the internet, uninstall their program, and run a full scan in Windows Security.</li>
-            <li>Report it: in the United States at <a href="https://reportfraud.ftc.gov/">reportfraud.ftc.gov</a>, in the United Kingdom at <a href="https://www.actionfraud.police.uk/">actionfraud.police.uk</a>, or to your local police.</li>
-          </ol>
-        </div>
-      </noscript>
-      <fieldset class="recover__what">
-        <legend><h2>What happened?</h2><span>Tick everything that fits.</span></legend>
-        <div class="recover__picks" data-recover-picks></div>
-      </fieldset>
-      <div class="recover__bar">
-        <label class="recover__country"><span>Where you live</span><select data-recover-country></select></label>
-        <div class="recover__actions">
-          <button type="button" class="btn btn--gold btn--sm" data-recover-print>Print</button>
-          <button type="button" class="btn btn--ghost btn--sm" data-recover-reset>Start over</button>
-        </div>
+    <div class="wrap-narrow practice" data-practice>
+      <div class="practice__top">
+        <span class="mono" data-practice-count>Message 1 of 12</span>
+        <div class="practice__dots" data-practice-dots aria-hidden="true"></div>
       </div>
-      <div class="recover__plan" data-recover-plan></div>
+      <div data-practice-stage>
+        <noscript><p class="prose">This practice inbox needs JavaScript to sort the messages. The clues to look for: a deadline, a threat or a secret; being asked for a password, a code, a card number or gift cards; a sender or link whose real address is not the company&rsquo;s own; and a number to call that came in the message.</p></noscript>
+      </div>
     </div>
   </section>
 </main>
@@ -155,8 +139,7 @@
 <script src="assets/js/vendor/lenis.min.js" defer></script>
 <script src="assets/js/motion.js" defer></script>
 <script src="assets/js/site.js"></script>
-<script src="assets/js/steps.js"></script>
-<script src="assets/js/recover.js"></script>
+<script src="assets/js/practice.js"></script>
 <script src="assets/js/anime.min.js" defer></script>
 <script src="assets/js/lux.js" defer></script>
 </body>
