@@ -26,6 +26,8 @@
 <meta property="og:image" content="https://wyattbombara.github.io/sentinel/assets/img/og.png">
 <meta name="twitter:card" content="summary_large_image">
 
+<!-- The italic in this page's heading, fetched with the page: arriving later, it re-set the heading and moved the page (CLS). -->
+<link rel="preload" href="assets/fonts/instrument-serif-italic-400.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="assets/css/lux.css">
 <title>Download Sentinel</title>
 <meta name="description" content="Download the Sentinel app for live scam, virus and malware protection on search results, email and downloads.">
@@ -49,7 +51,7 @@
       <a href="pricing.html" data-spy="pricing">Pricing</a>
       <a href="recover.html">Been scammed?</a>
     </nav>
-    <button class="theme-toggle" type="button" data-theme-toggle aria-label="Change theme">
+    <button class="theme-toggle" type="button" data-theme-toggle aria-label="Theme: Auto. Change theme">
       <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 3.5a8.5 8.5 0 0 1 0 17Z" fill="currentColor"/></svg>
       <span data-theme-label>Auto</span>
     </button>
@@ -87,8 +89,9 @@
     <div class="wrap">
       <div class="tile" data-reveal>
         <div class="tile__label">Release notes</div>
-        <h2 id="release-notes-title">Sentinel 1.17.5 Argus</h2>
-        <p>A new chapter on the home page where dozens of made-up scams swirl out of Sentinel's mask (point at one to see Sentinel's verdict), a calm field of drifting characters behind How it works, and a long list of fixes from testing the Windows app and the web app the way a person uses them every day.</p>
+        <h2 id="release-notes-title">Sentinel 1.18.0 Argus</h2>
+        <p>Share a suspicious text or link from your Android phone straight to Sentinel, and see Sentinel's masks beside links in Discord, WhatsApp, Messenger, Telegram and X messages in your browser. Plus a faster, fully accessible website and many fixes to the browser companion.</p>
+        <p>1.17.5: a new chapter on the home page where dozens of made-up scams swirl out of Sentinel's mask (point at one to see Sentinel's verdict), a calm field of drifting characters behind How it works, and a long list of fixes from testing the Windows app and the web app the way a person uses them every day.</p>
         <p>1.17.4: every new feature was tested as a person would use it, on real websites, real files and real screen settings, and what fell short was fixed: long conversations are now read to the end, Scan with Sentinel no longer starts a second copy of the app, the call checker's answer comes into view on a phone, and pages about scams no longer get the pause before paying.</p>
         <p>1.17.3: polish for the newest features: Scan with Sentinel in the right-click menu now works without signing in, checking the file on your computer; fewer false alarms from the slow-scam, gift card pause and sender checks; and the browser companion's warnings fit small windows.</p>
         <p>1.17.2: more fixes: parts of the home and privacy pages that never appeared on phones and tablets now show, the download page fits a phone and its installer details no longer run together, email scan advice is written for emails, and the browser companion follows sites that change screens without reloading.</p>
@@ -173,7 +176,7 @@
       </div>
       <div class="compare-wrap" data-reveal>
         <table class="compare">
-          <thead><tr><th></th><th>In your browser</th><th>Sentinel app</th></tr></thead>
+          <thead><tr><th scope="col"><span class="sr-only">What it does</span></th><th scope="col">In your browser</th><th scope="col">Sentinel app</th></tr></thead>
           <tbody>
             <tr><td>Scan a link you paste in</td><td class="yes">&check;</td><td class="yes">&check;</td></tr>
             <tr><td>Scan a file for viruses &amp; malware</td><td class="yes">&check;</td><td class="yes">&check;</td></tr>
