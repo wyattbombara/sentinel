@@ -16,7 +16,8 @@
   form.addEventListener('submit', async (ev) => {
     ev.preventDefault();
     const url = form.url.value.trim();
-    if (!url) return;
+    // A second press while a scan runs (an example clicked twice) leaves the running scan alone.
+    if (!url || $('button[type=submit]', form).dataset.busy) return;
     out.innerHTML = '<div class="panel scanning"><div class="scanning__rings">' + Masks.svg('scam') + '</div><h3>Scanning</h3><p class="muted" style="margin-top:6px">Known threats, the checklist and the comparison with known scams.</p></div>';
     try {
       const data = await busy($('button[type=submit]', form), 'Scanning', () => api('/guest/scan', { method: 'POST', body: { url } }));
@@ -30,4 +31,7 @@
       if (err.status === 429) left.textContent = 'No guest scans left today';
     }
   });
+  // Opened with an address (the Sentinel app's "Open in Sentinel" on a warning, signed out): scanned straight away.
+  const asked = new URLSearchParams(location.search).get('url');
+  if (asked && /^https?:\/\//i.test(asked) && asked.length < 2000) { form.url.value = asked; form.requestSubmit(); }
 })();
