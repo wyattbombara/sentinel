@@ -132,7 +132,8 @@ const BRANDS = [
   { token: 'linkedin', domains: ['linkedin.com', 'lnkd.in', 'licdn.com'] },
   { token: 'tiktok', domains: ['tiktok.com', 'tiktokcdn.com', 'tiktokv.com'] },
   { token: 'discord', domains: ['discord.com', 'discord.gg', 'discordapp.com', 'discord.media', 'discordapp.net'] },
-  { token: 'telegram', domains: ['telegram.org', 't.me', 'telegram.me'] },
+  // telegra.ph is Telegram's own publishing site; like t.me, its pages are written by users (see PATH_HOSTING).
+  { token: 'telegram', domains: ['telegram.org', 't.me', 'telegram.me', 'telegra.ph'] },
   { token: 'snapchat', domains: ['snapchat.com', 'snap.com'] },
 
   // Shopping and delivery
@@ -712,6 +713,13 @@ function levenshtein(a, b) {
   return prev[b.length];
 }
 
+/** One pair of neighbouring letters swapped ("medicrae" for "medicare"). */
+function swapped(a, b) {
+  if (a.length !== b.length || a === b) return false;
+  const i = [...a].findIndex((ch, k) => ch !== b[k]);
+  return a[i] === b[i + 1] && a[i + 1] === b[i] && a.slice(i + 2) === b.slice(i + 2);
+}
+
 /** Shannon entropy per character - random-looking names score high. */
 function entropy(s) {
   if (!s) return 0;
@@ -894,10 +902,13 @@ function brandInfo(p) {
     // Characters swapped for look-alikes ("paypa1", "g00gle", "micr0soft"): the name as written is not the brand, but
     // reads as it. That is a misspelling of the brand, and it was reported as "not a misspelling" because the
     // comparison below only ever saw the name with the swaps undone.
-    if (!lookalike && t.length >= 4 && [p.sld, ...p.sld.split(/[-_]/)].some((raw) => raw !== t && raw.length === t.length && /\d/.test(raw) && deskin(raw) === t)) { lookalike = brand; visual = true; }
+    // So are "rn" for "m" and "vv" for "w" ("rnedicare"), one letter longer than the brand.
+    if (!lookalike && t.length >= 4 && [p.sld, ...p.sld.split(/[-_]/)].some((raw) => raw !== t && deskin(raw) === t && ((raw.length === t.length && /\d/.test(raw)) || /rn|vv/.test(raw.toLowerCase())))) { lookalike = brand; visual = true; }
 
     if (!lookalike && t.length >= 5) {
-      const maxDist = t.length >= 8 ? 2 : 1;
+      // Two edits only on nine letters or more: on eight, two letters changed is a quarter of the word and makes
+      // other names ("medscape" is not "medicare"). Two letters swapped side by side ("medicrae") is one slip.
+      const maxDist = t.length >= 9 ? 2 : 1;
       const tSquashed = squash(t);
       const rawOf = new Map([[sldFlat, p.sld], ...p.sld.split(/[-_]/).map((r) => [deskin(r), r])]);
       for (const part of [sldFlat, ...hyphenParts]) {
@@ -916,7 +927,7 @@ function brandInfo(p) {
             prefix = Math.min(prefix, levenshtein(part.slice(0, n), t));
           }
         }
-        if ((whole > 0 && whole <= maxDist) || doubled || (prefix > 0 && prefix <= 1)) {
+        if ((whole > 0 && whole <= maxDist) || swapped(part, t) || doubled || (prefix > 0 && prefix <= 1)) {
           // Spelled close to the brand, but written in ordinary words, with no digit for a letter and no doubled
           // letter: another word ("overdrive", not "onedrive"), which a person reads as a different name. Noted,
           // not treated as a disguise.
@@ -1371,6 +1382,11 @@ const URL_CHECKS = [
       // Only schools and governments can register these, so a shared name (norton.edu) is theirs, not borrowed.
       if (/(^|\.)(edu|gov|mil|ac\.uk|gov\.uk|edu\.au|gov\.au)$/.test(p.suffix)) return pass(`.${p.suffix} names are only given to institutions`);
       const token = brand.inDomain.token;
+      // The brand's bare name on a country ending ("adidas.fr", "apple.co.jp"): the brand's own site for that
+      // country far more often than not, and its domain list can never name them all. Not on the endings handed
+      // out free or in bulk (.tk, .ml, .cc and the rest of RISKY_TLDS), where nobody checks who registers a name.
+      const cc = p.suffix.split('.').pop();
+      if (p.sld.toLowerCase() === token && /^[a-z]{2}$/.test(cc) && !L.RISKY_TLDS[cc]) return pass(`${p.registrable} is ${token}'s own name on a country ending`);
       // A brand joined to one ordinary word that asks nothing of you ("zoominfo", "chasecenter", the arena) is a name
       // of its own, the way people read it. A small note, which only counts next to other signs. Joined to a bait
       // word ("chaseonline", "paypalsupport"), with a hyphen or digits, it stays a warning.
