@@ -168,7 +168,7 @@
     void target.offsetWidth;
     target.classList.add('is-sighted');
     sight.classList.add('is-on');
-    // And the chapter is dug into: a moment of binary across the screen, its links' digits in the masks' colours.
+    // And the chapter is dug into: a moment of faint binary over its links.
     if (window.SentinelBinary) {
       window.SentinelBinary.burst(null, 650, {
         links: () => [...target.querySelectorAll('a, button, .chip-q, .res__title')].map((a) => a.getBoundingClientRect())
@@ -317,6 +317,17 @@
       }
     };
     walk(el);
+    if (rise) {
+      // A letter in a box of its own loses its kerning and ligatures: once risen, each word is plain text again.
+      const chars = el.querySelectorAll('.ch');
+      const last = chars[chars.length - 1];
+      const settle = (e) => {
+        if (e.propertyName !== 'transform') return;
+        last.removeEventListener('transitionend', settle);
+        el.querySelectorAll('.word').forEach((w) => { w.textContent = w.textContent; });
+      };
+      if (last) last.addEventListener('transitionend', settle);
+    }
   }
 
   /* ------------------------------------------- long paragraphs, word by word */
