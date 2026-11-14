@@ -2,14 +2,17 @@
 (() => {
   'use strict';
 
-  const { api, esc, $, $$, h, ago, until, bytes, toast, busy, verdict, resultGlyph, wireVerdict, color } = window.UI;
+  const { api, esc, $, $$, h, ago, until, bytes, toast, stateBlock, busy, verdict, resultGlyph, wireVerdict, color } = window.UI;
   const Masks = window.SentinelMasks;
   const view = $('#view');
   const desktop = window.sentinelDesktop || null;
+  // Motion Off (boot.js data-motion): nothing glides or rises. Asked each time: it can change while the app is open.
+  const still = () => document.documentElement.dataset.motion === 'off';
+  const glide = () => (still() ? 'auto' : 'smooth');
 
   const state = { me: null, config: null, plans: null, desktopInfo: null };
   const Share = window.SentinelShare;
-  // What the phone's Share menu handed over, on its way from /app/share to the check it opens (textView).
+  // What was handed to the Check page (checkView) from elsewhere: the phone's Share menu, the Overview box, the palette.
   let shared = null;
   // The share a POST to /app/share put in the box for this page (sw.js gives its time as ?box=); 0 when none.
   let shareBox = 0;
@@ -53,6 +56,8 @@
       state.me = me;
       state.config = config;
       state.plans = config.plans;
+      // Signed in: the look this account chose on its other devices (look.js), without waiting for it.
+      if (window.SentinelLook && SentinelLook.sync) SentinelLook.sync();
       // Signed in on any other page: a share made signed out moments ago (in another tab, or before signing in here)
       // opens its check here; anything older is emptied out. Signed out, it is left waiting for the sign-in.
       if (location.pathname.replace(/\/$/, '') !== '/app/share' && await Share.waiting()) history.replaceState({}, '', '/app/share');
@@ -61,7 +66,8 @@
         location.replace(`/login?next=${encodeURIComponent(location.pathname + location.search)}`);
         return;
       }
-      view.innerHTML = `<div class="banner banner--error"><b>Sentinel could not load.</b>&nbsp;${esc(err.message)}</div>`;
+      // Nothing else has been drawn yet, so loading again is this part's own loader.
+      failed(view, err, () => location.reload(), { what: 'Sentinel' });
       return;
     }
 
@@ -130,7 +136,6 @@
     });
     $('[data-name]').textContent = u.name || u.email;
     $('[data-plan]').textContent = `${plan().name} plan`;
-    $('[data-max-pill]').hidden = plan().features.emailManual;
 
     const us = usage();
     const row = (label, used, limit, unit = '') => {
@@ -196,15 +201,16 @@
   const ROUTES = {
     '/app': ['home', home],
     '/app/week': ['week', weekView],
-    '/app/scan': ['scan', scanView],
-    '/app/threats': ['threats', threatsView],
-    '/app/email': ['email', emailView],
-    '/app/text': ['text', textView],
+    '/app/check': ['check', checkView],
+    '/app/scan': ['check', checkView],
+    '/app/threats': ['check', checkView],
+    '/app/email': ['check', checkView],
+    '/app/text': ['check', checkView],
     '/app/history': ['history', historyView],
     '/app/protection': ['protection', protectionView],
     '/app/download': ['protection', protectionView],
     '/app/plan': ['plan', planView],
-    '/app/security': ['security', securityView],
+    '/app/settings': ['settings', settingsView],
     '/app/assistants': ['assistants', assistantsView],
     '/app/sites': ['sites', sitesView],
     '/app/checkup': ['checkup', checkupView],
@@ -212,8 +218,17 @@
     '/app/share': ['share', shareView]
   };
 
+  // Addresses of what moved into Settings, kept working (older apps, tray clicks, notifications and bookmarks use them):
+  // Security is Settings' account group, and these parts of Live protection are rows of their own there.
+  const MOVED_TO_SETTINGS = ['chat-safety', 'text-safety', 'parent-lock', 'my-sites'];
+
   function render() {
-    const path = location.pathname.replace(/\/$/, '') || '/app';
+    let path = location.pathname.replace(/\/$/, '') || '/app';
+    const hash = location.hash.slice(1);
+    if (path === '/app/security' || (path === '/app/protection' && MOVED_TO_SETTINGS.includes(hash))) {
+      history.replaceState(history.state, '', `/app/settings#${path === '/app/security' ? 'account' : hash}`);
+      path = '/app/settings';
+    }
     const [name, fn] = ROUTES[path] || ROUTES['/app'];
     $$('[data-route]').forEach((a) => {
       if (a.dataset.route === name) a.setAttribute('aria-current', 'page');
@@ -232,7 +247,7 @@
     fn(el, new URLSearchParams(location.search));
     // Every view draws its forms synchronously before it waits on anything, so what was typed can go back in now.
     restoreDrafts();
-    document.title = `${{ home: 'Overview', week: 'Your week', scan: 'Link scan', threats: 'Virus & malware', email: 'Email scan', text: 'Text scan', call: 'Is this call a scam?', history: 'History', protection: 'Live protection', plan: 'Plan & usage', security: 'Security', assistants: 'AI assistants', sites: 'Site rules', checkup: 'Browser checkup', recover: 'Recovery guide', share: 'Shared with Sentinel' }[name]} · Sentinel`;
+    document.title = `${{ home: 'Overview', week: 'Your week', check: 'Check', call: 'Is this call a scam?', history: 'History', protection: 'Live protection', plan: 'Plan & usage', settings: 'Settings', assistants: 'AI assistants', sites: 'Site rules', checkup: 'Browser checkup', recover: 'Recovery guide', share: 'Shared with Sentinel' }[name]} · Sentinel`;
   }
 
   /** Render a verdict with its checklist tools and follow-up actions. */
@@ -251,7 +266,7 @@
   // (cosmos.js fetches the models). data-rise says when the verdict landed: a mask ready soon enough rises into place.
   function riseMask(out) {
     const mask = $('[data-verdict-mask]', out);
-    if (!mask || !window.SentinelLoadMask3D || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    if (!mask || !window.SentinelLoadMask3D || still()) return;
     mask.dataset.rise = String(performance.now());
     mask.dataset.mask3d = mask.dataset.verdictMask;
     window.SentinelLoadMask3D();
@@ -273,14 +288,71 @@
     return technical ? 'That did not work. Try again, or choose Open log folder from the Sentinel icon in the system tray.' : text;
   }
 
+  /*
+   * A part of a page that could not load says so in its own place, the same way everywhere (ui.js stateBlock), with
+   * Try again running that part's own loader, never the whole page. When nothing answered at all, it waits for the
+   * connection instead, and loads again by itself when the browser says it is back. Focus goes to the new Try again
+   * only when Try again was what failed, so a person pressing it is never left on nothing.
+   */
+  const waitingForNet = new Map();
+  let retryPressed = false;
+  // `quiet`, for something optional (a card or an offer on the Overview): one grey line, `what` as its sentence.
+  function failed(slot, err, retry, { small = false, quiet = false, what = 'This' } = {}) {
+    if (!slot || !slot.isConnected) return;
+    const off = Boolean(err && err.offline);
+    const action = retry ? '<button class="btn btn--sm" type="button" data-retry>Try again</button>' : '';
+    if (quiet) {
+      slot.innerHTML = stateBlock(off ? 'offline' : 'unavailable', esc(what), { action, small: true }).replace('class="empty ', off ? 'class="empty empty--line ' : 'role="status" class="empty empty--line ');
+    } else {
+      const text = off ? 'Sentinel cannot be reached. Check your internet connection.' : esc((err && err.message) || 'Sentinel had a problem on its side. Try again in a moment.');
+      slot.innerHTML = stateBlock(off ? 'offline' : 'error', text, { title: off ? `${what} will load when you are back online` : `${what} could not be loaded`, action, small });
+    }
+    if (!retry) return;
+    const again = $('[data-retry]', slot);
+    again.addEventListener('click', () => { retryPressed = true; waitingForNet.delete(slot); retry(); });
+    for (const old of waitingForNet.keys()) if (!old.isConnected) waitingForNet.delete(old);
+    if (off) waitingForNet.set(slot, retry);
+    if (retryPressed) again.focus();
+    retryPressed = false;
+  }
+  /*
+   * A wait is as tall as what it waits for, so nothing under it jumps when the answer comes: the height that part had
+   * the last time it loaded on this device at this width (kept by `keep`), or, the first time, the height of what a
+   * new account sees there (app.css .h-<key>). Kept on this device only; with storage blocked, the first-time height.
+   */
+  const HEIGHTS = 'sentinel:heights';
+  const heightKey = (key) => `${key}:${innerWidth < 700 ? 'phone' : 'wide'}`;
+  const heights = () => { try { return JSON.parse(localStorage.getItem(HEIGHTS) || '{}') || {}; } catch { return {}; } };
+  function skel(key) {
+    const h = Number(heights()[heightKey(key)]) || 0;
+    return `<div class="skeleton h-${key}" data-skel="${key}"${h > 0 && h < 4000 ? ` style="height:${h}px"` : ''}></div>`;
+  }
+  function keep(slot, key) {
+    if (!slot || !slot.isConnected) return;
+    const cs = getComputedStyle(slot);
+    const all = heights();
+    all[heightKey(key)] = Math.round(slot.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom));
+    try { localStorage.setItem(HEIGHTS, JSON.stringify(all)); } catch { /* the first-time height, next time too */ }
+  }
+
+  // The one line under the top while nothing answers (ui.js decides that from fetch itself, not navigator.onLine).
+  document.addEventListener('sentinel:reach', (ev) => { const bar = $('[data-netbar]'); if (bar) bar.hidden = ev.detail.ok; });
+  addEventListener('online', () => {
+    for (const [slot, retry] of [...waitingForNet]) { waitingForNet.delete(slot); if (slot.isConnected) retry(); }
+  });
+
   /* ========================================================== shortcuts */
 
   const PAGES = [
-    ['Overview', '/app', 'home'], ['Your week', '/app/week', 'week'], ['Link scan', '/app/scan', 'scan'], ['Virus & malware scan', '/app/threats', 'threats'],
-    ['Email scan', '/app/email', 'email'], ['Text scan', '/app/text', 'text'], ['Is this call a scam?', '/call', 'call'], ['History', '/app/history', 'history'], ['Site rules', '/app/sites', 'sites'], ['Browser checkup', '/app/checkup', 'checkup'],
-    ['Live protection', '/app/protection', 'protection'], ['Plan & usage', '/app/plan', 'plan'], ['Security', '/app/security', 'security'],
+    ['Overview', '/app', 'home'], ['Your week', '/app/week', 'week'], ['Check a link, message, email, file or picture', '/app/check', 'check'],
+    ['Is this call a scam?', '/call', 'call'], ['History', '/app/history', 'history'], ['Site rules', '/app/sites', 'sites'], ['Browser checkup', '/app/checkup', 'checkup'],
+    ['Live protection', '/app/protection', 'protection'], ['Settings', '/app/settings', 'settings'], ['Plan & usage', '/app/plan', 'plan'],
     ['AI assistants', '/app/assistants', 'assistants'], ['Recovery guide', '/app/recover', 'recover']
   ];
+  // Simple view lists the pages most people need; the side bar hides the rest the same way (app.html data-full).
+  // They are never gone: a search finds every page, and the palette ends with Show all pages.
+  const FULL_ONLY = ['week', 'sites', 'checkup', 'plan', 'assistants'];
+  const simpleView = () => Boolean(window.SentinelSimple && window.SentinelSimple.get());
   const looksLikeUrl = (s) => /^(https?:\/\/)?([a-z0-9-]+\.)+[a-z]{2,}(:\d+)?(\/\S*)?$/i.test(s.trim()) || /^https?:\/\/\S+$/i.test(s.trim());
 
   let palette = null;
@@ -292,7 +364,7 @@
     // A combobox whose choice is read out as it moves (aria-activedescendant), as a screen reader expects.
     palette = h(`<div class="palette" role="dialog" aria-modal="true" aria-label="Search or scan">
       <div class="palette__box">
-        <div class="palette__input">${ICON.search}<input type="text" role="combobox" aria-expanded="true" aria-controls="palette-list" aria-autocomplete="list" placeholder="Paste a link to scan, or jump to a page" aria-label="Search pages, or paste a link to scan" autocomplete="off" spellcheck="false"><kbd>Esc</kbd></div>
+        <div class="palette__input">${ICON.search}<input type="text" role="combobox" aria-expanded="true" aria-controls="palette-list" aria-autocomplete="list" placeholder="Paste something to check, or jump to a page" aria-label="Search pages, or paste something to check" autocomplete="off" spellcheck="false"><kbd>Esc</kbd></div>
         <ul class="palette__list" id="palette-list" role="listbox" aria-label="Pages and links"></ul>
         <div class="palette__foot"><span><kbd>&uarr;</kbd><kbd>&darr;</kbd> move</span><span><kbd>&crarr;</kbd> open</span><span><kbd>/</kbd> scan box &middot; <kbd>?</kbd> shortcuts</span></div>
       </div>
@@ -303,25 +375,36 @@
     let items = [];
     let active = 0;
     let recent = [];
-    api('/account/history').then((d) => { recent = d.items.filter((i) => i.kind === 'url').slice(0, 30); paint(); }).catch(() => {});
+    let recentLost = false;
+    let allPages = !simpleView();
+    api('/account/history').then((d) => { recent = d.items.filter((i) => i.kind === 'url').slice(0, 30); paint(); }).catch(() => { recentLost = true; paint(); });
 
     const paint = () => {
       const q = input.value.trim();
       items = [];
-      if (q && looksLikeUrl(q)) items.push({ label: `Scan ${q}`, hint: 'Link scan', href: `/app/scan?url=${encodeURIComponent(q)}`, icon: ICON.link });
-      for (const [label, href] of PAGES) if (!q || label.toLowerCase().includes(q.toLowerCase())) items.push({ label, hint: 'Page', href, icon: ICON.shield });
-      for (const r of recent) if (q && r.target.toLowerCase().includes(q.toLowerCase())) items.push({ label: r.target, hint: 'Scan again', href: `/app/scan?url=${encodeURIComponent(r.target)}`, icon: ICON.clock });
+      if (q && looksLikeUrl(q)) items.push({ label: `Check ${q}`, hint: 'Link', href: `/app/check?url=${encodeURIComponent(q)}`, icon: ICON.link });
+      // Words, not a page's name: a message or a number to check (route.js says which).
+      else if (q && ((/\s/.test(q) && q.length >= 20) || window.SentinelRoute.guess({ text: q }) === 'number')) {
+        const kind = window.SentinelRoute.guess({ text: q });
+        items.push({ label: 'Check what you pasted', hint: kind === 'number' ? 'Phone number' : 'Message', run: () => { shared = { text: q }; navigate('/app/check'); }, icon: ICON.search });
+      }
+      for (const [label, href, route] of PAGES) if (q ? label.toLowerCase().includes(q.toLowerCase()) : allPages || !FULL_ONLY.includes(route)) items.push({ label, hint: 'Page', href, icon: ICON.shield });
+      if (!q && !allPages) items.push({ label: 'Show all pages', hint: 'Simple view', run: () => { allPages = true; paint(); }, keep: true, icon: ICON.search });
+      // A single setting, by any of its words ("roblox", "pin", "dark"), straight to its row.
+      if (q) for (const r of SETTINGS) if (settingMatches(r, q)) items.push({ label: r.label, hint: 'Setting', href: `/app/settings#${r.id}`, icon: ICON.shield });
+      for (const r of recent) if (q && r.target.toLowerCase().includes(q.toLowerCase())) items.push({ label: r.target, hint: 'Check again', href: `/app/check?url=${encodeURIComponent(r.target)}`, icon: ICON.clock });
       if (!q || 'sign out'.includes(q.toLowerCase())) items.push({ label: 'Sign out', hint: 'Account', run: () => signOut(), icon: ICON.lock });
       // Opened empty it lists every page (on a phone it is the More menu); a search shows the best few.
       if (q) items = items.slice(0, 9);
       active = Math.min(active, Math.max(0, items.length - 1));
       list.innerHTML = items.length ? items.map((it, i) => `<li role="option" id="palette-${i}" aria-selected="${i === active}" data-i="${i}"><span class="palette__icon">${it.icon}</span><span class="palette__label">${esc(it.label)}</span><span class="palette__hint">${esc(it.hint)}</span></li>`).join('')
-        : '<li class="palette__empty" role="option" aria-disabled="true">Nothing matches. Paste a link to scan it.</li>';
+        : '<li class="palette__empty" role="option" aria-disabled="true">Nothing matches. Paste a link or a message to check it.</li>';
+      if (q && recentLost) list.insertAdjacentHTML('beforeend', '<li class="palette__empty" role="option" aria-disabled="true">Your recent checks could not be loaded, so they are not in this search.</li>');
       if (items.length) input.setAttribute('aria-activedescendant', `palette-${active}`); else input.removeAttribute('aria-activedescendant');
       const on = $(`#palette-${active}`, list);
       if (on) on.scrollIntoView({ block: 'nearest' });
     };
-    const go = () => { const it = items[active]; if (!it) return; paletteFrom = null; closePalette(); if (it.run) it.run(); else navigate(it.href); };
+    const go = () => { const it = items[active]; if (!it) return; if (it.keep) { it.run(); input.focus(); return; } paletteFrom = null; closePalette(); if (it.run) it.run(); else navigate(it.href); };
     input.addEventListener('input', () => { active = 0; paint(); });
     input.addEventListener('keydown', (ev) => {
       if (ev.key === 'ArrowDown') { ev.preventDefault(); active = (active + 1) % Math.max(1, items.length); paint(); }
@@ -358,8 +441,8 @@
       if (typing || ev.ctrlKey || ev.metaKey || ev.altKey) return;
       if (ev.key === '/') {
         ev.preventDefault();
-        const box = $('.scanbox input');
-        if (box) { box.focus(); box.select(); } else navigate('/app/scan');
+        const box = $('[data-check-text]') || $('.scanbox input');
+        if (box && !box.hidden) { box.focus(); box.select(); } else navigate('/app/check');
       } else if (ev.key === '?') showShortcuts();
     });
     // Pasting a link anywhere on the page (outside a field) offers to scan it:
@@ -408,7 +491,7 @@
 
   function verifyBar() {
     const bar = h(`<div class="verify-bar" role="status">
-      <span><b>Confirm your email address.</b> We sent a link to ${esc(state.me.user.email)}. Confirming it shows the address is yours, so nobody else can claim this account with it.</span>
+      <span><b>Confirm your email address.</b> <span class="verify-bar__more">We sent a link to ${esc(state.me.user.email)}. Confirming it shows the address is yours, so nobody else can claim this account with it.</span></span>
       <button class="btn btn--sm" type="button" data-resend>Resend email</button>
     </div>`);
     $('[data-resend]', bar).addEventListener('click', (ev) => busy(ev.currentTarget, 'Sending', async () => {
@@ -501,13 +584,13 @@
 
   function historyList(items, { clickable = false } = {}) {
     if (!items.length) {
-      return `<div class="empty">${Masks.svg('scam')}<p>No scans yet. Paste a link above to run your first one.</p></div>`;
+      return stateBlock('waiting', 'No scans yet. Paste a link above to run your first one.', { small: true });
     }
     // On the History page a link's address is a real link (the keyboard reaches it; the whole row answers the mouse),
     // and every entry has its own Delete beside it.
     return `<ul class="list">${items.map((it) => {
       const link = clickable && it.kind === 'url';
-      const target = link ? `<a class="list__target" href="/app/scan?url=${encodeURIComponent(it.target)}" title="Scan again">${esc(it.target)}</a>` : esc(it.target);
+      const target = link ? `<a class="list__target" href="/app/check?url=${encodeURIComponent(it.target)}" title="Check again">${esc(it.target)}</a>` : esc(it.target);
       return `
       <li class="${link ? 'is-link' : ''}" ${link ? `data-rescan="${esc(it.target)}"` : ''}>
         <span class="list__icon">${it.kind === 'file' ? ICON.file : it.kind === 'email' ? ICON.mail : ICON.link}</span>
@@ -545,7 +628,7 @@
       ? usageCard(ICON.link, 'Unlimited', '', 'Fast link scans', 0, 0, false, 'no weekly limit')
       : usageCard(ICON.link, left('linkScans'), `/ ${fast.limit}`, 'Fast link scans left', fast.used, fast.limit);
     const deepCard = usageCard(ICON.search, deep.limit ? Math.max(0, deep.limit - deep.used) : 0, deep.limit ? `/ ${deep.limit}` : '', 'Delicate link scans left', deep.used, deep.limit, !deep.limit);
-    return `<a class="usage-link" href="/app/scan">${fastCard}</a><a class="usage-link" href="/app/scan">${deepCard}</a>`;
+    return `<a class="usage-link" href="/app/check">${fastCard}</a><a class="usage-link" href="/app/check">${deepCard}</a>`;
   }
 
   function usageCard(icon, n, unit, label, used, limit, locked, meta) {
@@ -612,7 +695,10 @@
     let cat;
     // Kept for a minute: the protection page redraws on every update event.
     const cached = state.models && Date.now() - state.models.at < 60000 ? state.models.cat : null;
-    try { cat = cached || await api('/models'); } catch { slot.innerHTML = '<p class="muted">The list of models is unavailable right now.</p>'; return; }
+    try { cat = cached || await api('/models'); } catch (err) {
+      failed(slot, err, () => { slot.innerHTML = '<div class="skeleton models__skeleton"></div>'; mountModels(root); }, { small: true, what: 'The list of models' });
+      return;
+    }
     state.models = { cat, at: cached ? state.models.at : Date.now() };
     if (!slot.isConnected) return;
     let up = (state.desktopInfo && state.desktopInfo.update) || null;
@@ -720,12 +806,14 @@
     }
     if (err.code === 'weekly_limit_reached') {
       // Which allowance ran out (the server's sentence names it); with the delicate ones gone, fast scans still work.
-      return `<div class="banner"><div><b>${esc(err.message)}</b> They come back ${until(err.extra.resetsAt)}. ${/delicate/.test(err.message) && location.pathname === '/app/scan' ? 'Fast scans still work: choose Fast above. ' : ''}<a href="/app/plan" class="u-gold">See plans</a></div></div>`;
+      return `<div class="banner"><div><b>${esc(err.message)}</b> They come back ${until(err.extra.resetsAt)}. ${/delicate/.test(err.message) && location.pathname === '/app/check' ? 'Fast scans still work: turn off Look deeper above. ' : ''}<a href="/app/plan" class="u-gold">See plans</a></div></div>`;
     }
     if (err.code === 'plan_required') {
       return `<div class="banner"><div><b>${esc(err.message)}</b> <a href="/app/plan" class="u-gold">Compare plans</a></div></div>`;
     }
-    return `<div class="banner banner--error"><div><b>Scan failed.</b> ${esc(err.message)}</div></div>`;
+    // The form above still holds what was given, so pressing Check again is the way to try again.
+    if (err.offline) return stateBlock('offline', 'Check your internet connection, then press Check again.', { title: 'Sentinel cannot be reached', small: true });
+    return stateBlock('error', esc(err.message || 'Sentinel had a problem on its side. Try again in a moment.'), { title: 'The check did not finish', small: true });
   }
 
   /* ================================================================ home */
@@ -741,14 +829,15 @@
       ${title(`${greet}, ${esc(u.firstName)}`,'Paste anything you are unsure about. Sentinel will tell you exactly what it finds.')}
       <form class="scanbox" data-quick>
         ${ICON.search}
-        <input name="url" type="text" inputmode="url" autocomplete="off" spellcheck="false" placeholder="Paste a link from a message, email or search result" aria-label="Link to scan">
-        <button class="btn btn--gold" type="submit">Scan</button>
+        <input name="url" type="text" autocomplete="off" spellcheck="false" placeholder="Paste a link, a message or a phone number" aria-label="What to check">
+        <button class="btn btn--gold" type="submit">Check</button>
       </form>
-      <div class="scan-meta"><span>${scanLeftText(plan().features.research ? 'delicate' : 'fast')}</span><a href="/app/threats">Scan a file instead &rarr;</a></div>
+      <div class="scan-meta"><span>Sentinel works out what it is and says which check it runs.</span><a href="/app/check">Check an email, a file or a picture &rarr;</a></div>
+      <div data-first></div>
 
       <div class="usage-list u-mt-lg">
         ${scanCards(us)}
-        <a class="usage-link" href="/app/threats">${usageCard(ICON.shield, left('fileScans'), `/ ${us.fileScans.limit}`, 'Virus & malware scans left', us.fileScans.used, us.fileScans.limit)}</a>
+        <a class="usage-link" href="/app/check">${usageCard(ICON.shield, left('fileScans'), `/ ${us.fileScans.limit}`, 'Virus & malware scans left', us.fileScans.used, us.fileScans.limit)}</a>
         <a class="usage-link" href="/app/protection">${liveCard(us, f)}</a>
       </div>
 
@@ -759,38 +848,39 @@
 
       <div class="panel u-mt">
         <div class="panel__head"><div><h2>Recent scans</h2><p>Your last 30 days</p></div><a class="btn btn--sm" href="/app/history">View all</a></div>
-        <div data-recent><div class="skeleton u-h-md" ></div></div>
+        <div data-recent>${skel('recent')}</div>
       </div>`;
 
     weekCard($('[data-week-card]', el));
-    // One offer at a time: exposure alerts are offered only while chat safety's question is not showing.
+    // One offer at a time: the first-run choices, then chat safety, then exposure alerts, each on a later visit.
     const chatAsk = $('[data-chat-ask]', el);
-    askChatSafety(chatAsk).then(() => { if (!chatAsk.innerHTML) askExposureAlerts($('[data-exposure-ask]', el)); }).catch(() => {});
+    // A failure says so quietly in the offer's place (askChatSafety), with Try again running both offers again.
+    const offers = () => { chatAsk.innerHTML = ''; return askChatSafety(chatAsk, offers).then(() => { if (!chatAsk.innerHTML) askExposureAlerts($('[data-exposure-ask]', el)); }); };
+    if (!firstChoices($('[data-first]', el))) offers();
     $('[data-quick]', el).addEventListener('submit', (ev) => {
       ev.preventDefault();
       const url = ev.target.url.value.trim();
-      if (url) navigate(`/app/scan?url=${encodeURIComponent(url)}`);
+      if (!url) return;
+      // A link opens under its own address (Back and reload keep it); anything else is carried over in memory, never in the address.
+      if (looksLikeUrl(url)) navigate(`/app/check?url=${encodeURIComponent(url)}`);
+      else { shared = { text: url }; navigate('/app/check'); }
     });
 
-    try {
-      const data = await api('/account/history?limit=6');
-      const slot = $('[data-recent]', el);
-      if (!slot) return;
-      slot.innerHTML = historyList(data.items.slice(0, 6), { clickable: true });
-      slot.addEventListener('click', (ev) => {
-        const row = ev.target.closest('[data-rescan]');
-        if (row) navigate(`/app/scan?url=${encodeURIComponent(row.dataset.rescan)}`);
-      });
-      // The rows say they are buttons, so Enter and Space must work on them too.
-      slot.addEventListener('keydown', (ev) => {
-        const row = ev.target.closest('[data-rescan]');
-        if (row && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); row.click(); }
-      });
-    } catch {
-      // Never a skeleton that loads forever: say so, plainly.
-      const slot = $('[data-recent]', el);
-      if (slot) slot.innerHTML = '<p class="muted">Recent scans could not be loaded. They will be back next time you open this page.</p>';
-    }
+    const slot = $('[data-recent]', el);
+    slot.addEventListener('click', (ev) => {
+      const row = ev.target.closest('[data-rescan]');
+      if (row) navigate(`/app/check?url=${encodeURIComponent(row.dataset.rescan)}`);
+    });
+    // The rows say they are buttons, so Enter and Space must work on them too.
+    slot.addEventListener('keydown', (ev) => {
+      const row = ev.target.closest('[data-rescan]');
+      if (row && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); row.click(); }
+    });
+    const recent = async () => {
+      try { slot.innerHTML = historyList((await api('/account/history?limit=6')).items.slice(0, 6), { clickable: true }); keep(slot, 'recent'); }
+      catch (err) { failed(slot, err, () => { slot.innerHTML = skel('recent'); recent(); }, { small: true, what: 'Your recent scans' }); }
+    };
+    recent();
   }
 
   /* ============================================================ your week */
@@ -810,7 +900,11 @@
 
   async function weekCard(slot) {
     let data;
-    try { data = await loadWeek(); } catch { return; }
+    // An optional card: a failure is one quiet line in its place, with Try again, never a red box.
+    try { data = await loadWeek(); } catch (err) {
+      failed(slot, desktop && desktop.week && !err.offline ? { message: desktopError(err) } : err, () => { slot.innerHTML = ''; weekCard(slot); }, { small: true, quiet: true, what: 'Your week could not be loaded.' });
+      return;
+    }
     const w = data.weeks[data.weeks.length - 1];
     if (!slot.isConnected || (!w.checked && !w.caught)) return;
     slot.innerHTML = `<div class="panel u-mt week-card"><div class="panel__head"><div><h2>${esc(w.headline)}</h2>
@@ -820,11 +914,12 @@
 
   async function weekView(el) {
     el.innerHTML = `${title('Your week with Sentinel', 'What Sentinel did for you, Monday to Sunday. Only real counts, never what the links, files or messages were.')}
-      <div data-week><div class="skeleton u-h-md"></div></div>`;
+      <div data-week>${skel('week')}</div>`;
     const slot = $('[data-week]', el);
     let data;
-    try { data = await loadWeek(); } catch {
-      slot.innerHTML = '<p class="muted">Your week could not be loaded. It will be back next time you open this page.</p>';
+    // In the Windows app the week comes from the app, whose own message is plain already (desktopError).
+    try { data = await loadWeek(); } catch (err) {
+      failed(slot, desktop && desktop.week && !err.offline ? { message: desktopError(err) } : err, () => weekView(el), { what: 'Your week' });
       return;
     }
     if (!slot.isConnected) return;
@@ -836,7 +931,6 @@
     const caughtAny = weeks.some((x) => x.caught > 0);
     const val = (x) => (caughtAny ? x.caught : x.checked);
     const top = Math.max(1, ...weeks.map(val));
-    const info = state.desktopInfo;
     slot.innerHTML = `
       <div class="panel week-hero">
         <p class="week-hero__k">${esc(weekLabel(w, weeks.length - 1, weeks))}, so far</p>
@@ -848,27 +942,18 @@
           <span class="usage-row__icon">${ICON[icon]}</span>
           <span class="usage-row__l">${esc(label)}<small>last week: ${before.counts[k].toLocaleString()}</small></span>
           <b class="usage-row__n tabular">${w.counts[k].toLocaleString()}</b></div>`).join('')}</div>`
-        : `<div class="empty u-mt">${Masks.svg('scam')}<p>Nothing yet. As Sentinel checks links, files and messages for you, your week fills in here.</p></div>`}
+        : `<div class="panel u-mt">${stateBlock('waiting', 'Nothing yet. As Sentinel checks links, files and messages for you, your week fills in here.', { action: '<a class="btn btn--sm btn--gold" href="/app/check">Check something</a>' })}</div>`}
       ${caughtAny || weeks.some((x) => x.checked) ? `<div class="panel u-mt">
         <div class="panel__head"><div><h2>${caughtAny ? 'Caught, week by week' : 'Checked, week by week'}</h2><p>The last four weeks. Each week starts on Monday.</p></div></div>
         <div class="week-bars" role="img" aria-label="${esc(weeks.map((x, i) => `${weekLabel(x, i, weeks)}: ${val(x)}`).join(', '))}">
           ${weeks.map((x, i) => `<div class="week-bars__col" style="--li:${i}"><b class="tabular">${val(x).toLocaleString()}</b><i style="height:${Math.round((val(x) / top) * 100)}%"></i><span>${esc(weekLabel(x, i, weeks))}</span></div>`).join('')}
         </div></div>` : ''}
-      ${desktop && desktop.setWeekRecap ? `<div class="panel u-mt"><label class="setting"><div><b>A note about your week</b>
-          <span>Once a week, a Windows notification with last week in one line. Never while a game or video is full screen.</span></div>
-          <input class="switch" type="checkbox" data-week-recap aria-label="A note about your week" ${info && info.weekRecap ? 'checked' : ''}></label></div>` : ''}
+      ${desktop && desktop.setWeekRecap ? '<p class="set-away u-mt"><a href="/app/settings#week-note">A weekly note in Windows: choose it in Settings</a></p>' : ''}
       <ul class="live__facts u-mt">
         <li>Counted as numbers for each week and kept for five weeks. Sentinel never keeps which links, files, commands or messages they were for this page.</li>
         <li>Private browser windows are not counted.${desktop ? '' : ' Files, copied commands, wallet swaps and chat messages are counted by the Sentinel app for Windows.'}</li>
       </ul>`;
-    const sw = $('[data-week-recap]', slot);
-    if (sw) sw.addEventListener('change', async () => {
-      try {
-        await desktop.setWeekRecap(sw.checked);
-        if (state.desktopInfo) state.desktopInfo.weekRecap = sw.checked;
-        toast(sw.checked ? 'Done. Your first note comes after this week is over.' : 'No more weekly notes.', 'success');
-      } catch (err) { sw.checked = !sw.checked; toast(desktopError(err), 'error'); }
-    });
+    keep(slot, 'week');
   }
 
   function protectionTeaser() {
@@ -895,117 +980,525 @@
         <div class="live__text"><h2>Live scanning is off</h2><p>One click. Sentinel then watches whichever browser is in front of you, and rests when none is.</p></div>
         <a class="btn btn--gold live__button" href="/app/protection">Start scanning</a></div></div>`;
     }
-    return `<div class="panel"><div class="panel__head"><div><h2>${live.enabled ? 'Live scanning is on' : 'Protection is on'}</h2><p>${live.enabled ? 'Look for the gold mask in the corner of your browser. Downloads and new programs are watched too.' : 'Downloads and new programs on this computer are being watched.'}</p></div><a class="btn btn--sm" href="/app/protection">Manage</a></div></div>`;
+    // Only what the app says is running is named: never "on" for something that is off, never a count.
+    const info = state.desktopInfo;
+    if (!info) return `<div class="panel"><div class="panel__head"><div><h2>Live protection</h2><p>The Sentinel app did not say what it is watching. Open Live protection to see.</p></div><a class="btn btn--sm" href="/app/protection">Open</a></div></div>`;
+    const watched = [info.downloads && info.downloads.active && 'new downloads', info.defense && info.defense.active && 'new programs and startup entries'].filter(Boolean);
+    const also = watched.join(' and ');
+    const head = live.enabled ? 'Live scanning is on' : watched.length ? `Sentinel is watching ${also}` : 'Sentinel is not watching anything right now';
+    const body = live.enabled ? `Look for the mask in the corner of your browser.${also ? ` Sentinel is also watching ${also}.` : ''}`
+      : watched.length ? 'Live scanning is off, so pages and search results are not checked as you browse.'
+        : 'Live scanning, Download protection and Defense are all off.';
+    return `<div class="panel"><div class="panel__head"><div><h2>${head}</h2><p>${body}</p></div><a class="btn btn--sm${live.enabled || watched.length ? '' : ' btn--gold'}" href="/app/settings#protection">${live.enabled || watched.length ? 'Manage' : 'Turn on'}</a></div></div>`;
   }
 
-  /* ============================================================ link scan */
+  /* =============================================================== check */
 
-  // Fast: threat lists, the checklist and comparison. Delicate: the site researched as well (Pro and up).
-  const scanModeKey = 'sentinel.scanMode';
-  function scanLeftText(mode) {
-    const u = usage();
-    const m = mode === 'delicate' ? u.deepScans : u.linkScans;
-    if (!m) return '';
-    const name = mode === 'delicate' ? 'delicate scans' : 'fast scans';
-    return uncapped(m.limit) ? `Unlimited ${name}` : `${Math.max(0, m.limit - m.used)} of ${m.limit} ${name} left this week`;
+  // One page for whatever a person is unsure of: a link, a message, a whole email, a file, or a picture of a QR code or
+  // of a text. route.js says what it is, and so which scan runs and which of the week's scans it uses; the page says
+  // that in words before anything is spent, and one press changes it. The old pages' addresses (/app/scan,
+  // /app/threats, /app/email, /app/text) open it, so links from the Windows app, the history and old bookmarks still work.
+  const Route = window.SentinelRoute;
+  // The key the old Fast and Delicate switch kept, so a choice made there carries over to Look deeper.
+  const deeperKey = 'sentinel.scanMode';
+  // The most of a pasted conversation sent for a check (server/routes/scan.routes.js reads the same).
+  const TEXT_MAX = 40000;
+  const KIND_NAME = { link: 'Link', download: 'Download', message: 'Message', email: 'Email' };
+  const SCAN_NAME = { linkScans: 'fast scan', deepScans: 'delicate scan', fileScans: 'virus scan' };
+  // What the empty page offers to show: a made-up example of each kind, none of them real addresses.
+  const CHECK_EXAMPLES = {
+    link: 'paypa1-secure-login.com/account',
+    message: 'USPS: Your parcel is on hold at our depot due to an unpaid $1.99 redelivery fee. Pay within 24 hours or it will be returned: https://usps-redeliver.top/track',
+    email: ['From: PayPal Service <service@paypa1-help.top>', 'Subject: Your account is limited', '',
+      'We noticed unusual activity. Confirm your details within 24 hours at https://paypa1-secure-login.com/verify or your account will be closed.'].join('\n')
+  };
+
+  /** What a check costs, from the account's own numbers: "Uses 1 fast scan: 9 of 10 left this week." */
+  function spends(meter) {
+    const m = usage()[meter];
+    const name = SCAN_NAME[meter];
+    if (!m || !name) return '';
+    if (uncapped(m.limit)) return `Uses 1 ${name}. There is no weekly limit.`;
+    const n = Math.max(0, m.limit - m.used);
+    if (!n) return `No ${name}s are left this week. They come back ${until(state.me.week.resetsAt)}.`;
+    return `Uses 1 ${name}: ${n} of ${m.limit} left this week.`;
   }
 
-  function scanView(el, params) {
+  /** What Sentinel saw and what it will do with it, as [the kind, the check and its cost]. */
+  function says(r, file) {
+    const deep = r.mode === 'delicate' ? ', and researches the site' : '';
+    switch (r.kind) {
+      case 'link': return ['A link.', `Sentinel checks it against the threat lists, the checklist and known scams${deep}. ${spends(r.meter)}`];
+      case 'download': return ['A download link.', r.path === '/scan/threat'
+        ? `Sentinel checks it for viruses and malware. ${spends(r.meter)}`
+        : `Sentinel checks it for scams, viruses and malware${deep}. ${spends(r.meter)}`];
+      case 'message': return ['A message.', `Sentinel reads its words for known scams and checks its links by their address, without opening them. ${spends(r.meter)}`];
+      case 'email': return ['An email.', r.limited
+        ? `Sentinel checks its words and links as a message. Checking who really sent it is part of Max. ${spends(r.meter)}`
+        : `Sentinel checks the sender, the words, every link and attachment name, and with its headers, who really sent it. ${spends(r.meter)}`];
+      case 'number': return ['A phone number.', 'Sentinel cannot look a number up. Calling you now? Use the call check below. Sent you a message? Paste the whole message.'];
+      case 'file': return [`${file.name}, ${bytes(file.size)}.`, file.size > 25 * 1024 * 1024
+        ? 'Files up to 25 MB can be checked here.'
+        : `Sentinel checks it for viruses, malware and files in disguise. ${spends(r.meter)}`];
+      default: return ['', ''];
+    }
+  }
+
+  function checkView(el, params) {
     const f = plan().features;
-    let mode = 'fast';
-    try { mode = localStorage.getItem(scanModeKey) || (f.research ? 'delicate' : 'fast'); } catch { mode = f.research ? 'delicate' : 'fast'; }
-    if (!f.research) mode = 'fast';
+    const preset = params.get('url');
+    // An old page's address: the Check page, under its own.
+    if (location.pathname.replace(/\/$/, '') !== '/app/check') history.replaceState(history.state, '', `/app/check${preset ? `?url=${encodeURIComponent(preset)}` : ''}`);
+    const camera = Boolean(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
     el.innerHTML = `
-      ${title('Link scan', f.research
-        ? 'Fast checks known threats, the full checklist and known scams in about a second. Delicate also researches the site, for scam, virus and malware.'
-        : 'Known threats, the full checklist and comparison with known scams. Pro adds delicate scans, which research the site too.')}
-      ${modelSlot(true)}
-      <div class="scan-mode">
-        <div class="seg" role="group" aria-label="Scan mode">
-          <button type="button" class="seg__btn${mode === 'fast' ? ' is-on' : ''}" data-scan-mode="fast" aria-pressed="${mode === 'fast'}">Fast</button>
-          <button type="button" class="seg__btn${mode === 'delicate' ? ' is-on' : ''}" data-scan-mode="delicate" aria-pressed="${mode === 'delicate'}" ${f.research ? '' : 'disabled title="Delicate scans come with Pro, Max and Ultimate"'}>Delicate</button>
+      ${title('Check something', 'Paste a link, a message or a whole email, or add a file or a picture of one. Sentinel works out which it is and runs the right check.')}
+      <form class="ask" data-form data-draft="check" novalidate>
+        <div class="ask__box" data-drop>
+          <textarea class="ask__text" name="text" rows="3" spellcheck="false" autocomplete="off" placeholder="Paste it here" aria-label="What to check" aria-describedby="check-says" data-check-text></textarea>
+          <div class="ask__file" data-file-chip hidden></div>
+          <div class="ask__bar">
+            <button class="ask__add" type="button" data-add>${ICON.upload}<span>Add a file or picture</span></button>
+            <input type="file" data-file hidden aria-label="Choose a file or a picture to check">
+            ${camera ? `<button class="ask__add" type="button" data-qr-cam aria-expanded="false">${ICON.qr}<span>QR code</span></button>` : ''}
+            <button class="btn btn--gold ask__go" type="submit">Check</button>
+          </div>
         </div>
-        <span class="muted" data-mode-note>${mode === 'delicate' ? 'Researches the site: its age, certificate, redirects and page content.' : 'Threat lists, the full checklist and known scams, in about a second.'}</span>
-      </div>
-      <form class="scanbox" data-form>
-        ${ICON.search}
-        <input name="url" type="text" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://" aria-label="Link to scan" required>
-        <button class="btn btn--gold" type="submit">Scan link</button>
+        <div class="ask__said" id="check-says">
+          <p class="ask__says" data-says aria-live="polite"></p>
+          <p class="ask__try" data-try>Not sure what goes here? See how Sentinel reads
+            <button type="button" data-example="link">a link</button>, <button type="button" data-example="message">a text message</button>,
+            <button type="button" data-example="email">an email</button> or <button type="button" data-example="file">a file</button>.
+            Nothing is checked until you press Check.</p>
+          <div class="ask__as" data-as role="group" aria-label="Check it as" hidden></div>
+          <button type="button" class="ask__deeper" data-deeper aria-pressed="false" hidden><i aria-hidden="true"></i>Look deeper: research the site</button>
+          <div class="ask__help" data-header-help hidden>
+            <p>To see who really sent it, paste the email with its headers.</p>
+            <p><b>Gmail:</b> open the email, click the three dots, choose Show original, then Copy to clipboard.</p>
+            <p><b>Outlook:</b> open the email, click the three dots, choose View, then View message source, and copy it all.</p>
+          </div>
+        </div>
+        <div class="field ask__from" data-from hidden><label for="check-from">Who sent it <span class="opt">(optional)</span></label><input class="input" id="check-from" name="from" dir="auto" placeholder="The number or name the message shows" autocomplete="off" maxlength="80"></div>
+        <figure class="shot" data-shot-preview hidden><img alt="The picture being read"><figcaption data-shot-status></figcaption></figure>
+        <div class="qr-cam" data-qr-camview hidden><video muted playsinline aria-label="Camera view"></video><p class="muted">Hold the QR code up to the camera. It is read here, and the camera turns off as soon as a code is found.</p></div>
       </form>
-      <div class="scan-meta"><span data-left>${scanLeftText(mode)}</span>
-        <span class="examples">
-          <button class="chip" type="button" data-example="paypa1-secure-login.com/account">paypa1-secure-login.com</button>
-          <button class="chip" type="button" data-example="https://github.com">github.com</button>
-        </span>
-      </div>
-      ${qrPicker()}
+      ${iphone ? `<p class="field__hint" data-iphone-note>${esc(IPHONE_NOTE)}</p>` : ''}
+      <p class="ask__call">On the phone with someone right now? <a href="/call">Is this call a scam?</a></p>
+      ${localNote()}
       <div data-qr-out aria-live="polite"></div>
-      <div data-out></div>`;
+      <div data-out aria-live="polite"></div>`;
 
-    mountModels(el);
     const form = $('[data-form]', el);
-    const out = $('[data-out]', el);
-    $$('[data-example]', el).forEach((b) => b.addEventListener('click', () => { form.url.value = b.dataset.example; form.requestSubmit(); }));
-    $$('[data-scan-mode]', el).forEach((b) => b.addEventListener('click', () => {
-      if (b.disabled) return;
-      mode = b.dataset.scanMode;
-      try { localStorage.setItem(scanModeKey, mode); } catch { /* not stored */ }
-      $$('[data-scan-mode]', el).forEach((x) => { x.classList.toggle('is-on', x === b); x.setAttribute('aria-pressed', String(x === b)); });
-      $('[data-mode-note]', el).textContent = mode === 'delicate' ? 'Researches the site: its age, certificate, redirects and page content.' : 'Threat lists, the full checklist and known scams, in about a second.';
-      $('[data-left]', el).textContent = scanLeftText(mode);
-    }));
-
-    // A QR code: read here, explained, and a link in it checked with a fast scan, whatever mode is chosen: a few test
-    // pictures must not quietly use up delicate scans. A delicate look is one press of Scan link away.
+    const box = $('[data-check-text]', el);
+    const drop = $('[data-drop]', el);
+    const chip = $('[data-file-chip]', el);
+    const fileInput = $('[data-file]', el);
+    const saysEl = $('[data-says]', el);
+    const asEl = $('[data-as]', el);
+    const deeperBtn = $('[data-deeper]', el);
+    const fromBox = $('[data-from]', el);
+    const tryEl = $('[data-try]', el);
+    const go = $('.ask__go', el);
+    const preview = $('[data-shot-preview]', el);
+    const shotStatus = $('[data-shot-status]', el);
     const qrOut = $('[data-qr-out]', el);
-    wireQr(el, async (text) => {
-      const info = await explainQr(qrOut, text, { focus: true });
-      if (!info || !info.url) return;
-      form.url.value = info.url;
-      await scanLink(info.url, true);
-    });
+    const out = $('[data-out]', el);
 
-    form.addEventListener('submit', (ev) => {
-      ev.preventDefault();
-      const url = form.url.value.trim();
-      if (url) scanLink(url, false);
-    });
+    let file = null;
+    let choice = null;
+    let deeper = f.research;
+    try { deeper = f.research && localStorage.getItem(deeperKey) !== 'fast'; } catch { /* the plan's best */ }
+    const deepLeft = () => { const m = usage().deepScans; return Boolean(m) && (uncapped(m.limit) || m.limit - m.used > 0); };
+    const pick = () => Route.pick({ text: box.value, file }, { features: f, choice, deeper: deeper && deepLeft() });
 
-    // A double press whose first answer came back before the second press (a listed scam answers in milliseconds)
-    // got past the busy guard and spent a second scan: the same address pressed again this soon is the same press.
-    let lastPress = { key: '', at: 0 };
-    async function scanLink(url, fromQr) {
-      // A second press while a scan runs (an example clicked twice) leaves the running scan alone.
-      if ($('button[type=submit]', form).dataset.busy) return;
-      const key = `${fromQr ? 'fast' : mode} ${url}`;
-      if (key === lastPress.key && Date.now() - lastPress.at < 600) return;
-      lastPress = { key, at: Date.now() };
-      // A link typed after a QR code is a scan of its own: the code's card goes.
+    let kindsShown = '';
+    function refresh() {
+      const r = pick();
+      const [lead, rest] = says(r, file);
+      // Only when it changes: a screen reader hears the sentence once, not at every key pressed.
+      const said = `${lead ? `<b>${esc(lead)}</b> ` : ''}${esc(rest)}`;
+      if (saysEl.innerHTML !== said) saysEl.innerHTML = said;
+      const kinds = Route.choices({ text: box.value, file });
+      // Drawn again only when the kinds on offer change, so the one just pressed keeps the focus.
+      if (kinds.join() !== kindsShown) {
+        kindsShown = kinds.join();
+        asEl.innerHTML = kinds.length > 1 ? `<span class="ask__as-k">Check it as</span>${kinds.map((k) => `<button type="button" class="ask__kind" data-kind="${k}" aria-pressed="false">${KIND_NAME[k]}</button>`).join('')}` : '';
+        asEl.hidden = kinds.length < 2;
+      }
+      $$('[data-kind]', asEl).forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.kind === r.kind)));
+      deeperBtn.hidden = !(f.research && r.path === '/scan/link' && deepLeft());
+      deeperBtn.setAttribute('aria-pressed', String(r.mode === 'delicate'));
+      fromBox.hidden = r.kind !== 'message';
+      tryEl.hidden = r.kind !== 'empty';
+      // An email checked for who really sent it, pasted without the headers that say so: how to copy them.
+      $('[data-header-help]', el).hidden = !(r.path === '/scan/email' && !pictured && !/^(Authentication-Results|Received-SPF|DKIM-Signature|Received)[ \t]*:/im.test(box.value));
+      form.dataset.kind = r.kind;
+      return r;
+    }
+
+    function showFile() {
+      box.hidden = Boolean(file);
+      chip.hidden = !file;
+      chip.innerHTML = file ? `<span class="ask__file-icon">${ICON.file}</span><span class="ask__file-name">${esc(file.name)}</span><span class="ask__file-size">${bytes(file.size)}</span>
+        <button class="btn btn--sm btn--ghost" type="button" data-unfile aria-label="Remove ${esc(file.name)}">Remove</button>` : '';
+    }
+
+    /** A file chosen, dropped or handed over: a picture is read here, an .eml becomes its text, anything else waits for Check. */
+    async function take(picked) {
+      if (!picked) return false;
+      const kind = Route.guess({ file: picked });
+      if (kind === 'picture') { readPicture(picked); return false; }
+      if (kind === 'eml') {
+        if (picked.size > 10 * 1024 * 1024) { toast('That email is too large to read here.', 'error'); return false; }
+        file = null;
+        showFile();
+        box.value = await picked.text();
+        box.dispatchEvent(new Event('input', { bubbles: true }));
+        return true;
+      }
+      file = picked;
+      choice = null;
+      showFile();
+      refresh();
+      go.focus();
+      return true;
+    }
+
+    let running = false;
+    // The same thing checked a moment ago: a double press, or a second click after a quick answer, is not a second scan.
+    let last = { key: '', at: 0 };
+    async function run(r, { fromQr = false } = {}) {
+      if (running) return;
+      const key = [r.kind, r.path, r.url || '', r.mode || '', file ? `${file.name}:${file.size}` : box.value].join('|');
+      if (r.path && key === last.key && performance.now() - last.at < 1500) return;
+      if (r.kind === 'empty') { toast('Paste a link, a message or an email first, or add a file.', 'info'); box.focus(); return; }
+      if (r.kind === 'number') { $('.ask__call a', el).focus(); return; }
+      if (r.kind === 'file' && file.size > 25 * 1024 * 1024) { toast('Files up to 25 MB can be checked.', 'error'); return; }
+      running = true;
       if (!fromQr) qrOut.innerHTML = '';
-      // Remembered in the history entry, so Back and reload show the address without spending another scan.
-      history.replaceState({ scanned: url }, '', `/app/scan?url=${encodeURIComponent(url)}`);
-      const button = $('button[type=submit]', form);
-      const runMode = fromQr ? 'fast' : mode;
-      const deep = runMode === 'delicate';
-      // A delicate scan digs: quiet binary behind the wait while the site is researched (binary.js).
-      const watch = watchScan(out, linkSteps(deep), { dig: deep });
+      // What the picture's reader said is done with: the answer is below.
+      if (!preview.hidden && !fromQr) { preview.hidden = true; shotStatus.textContent = ''; }
       try {
-        const data = await busy(button, fromQr ? 'Checking the link in the code' : 'Scanning', () => api('/scan/link', { method: 'POST', body: { url, mode: runMode }, onStage: watch.onStage }));
-        applyUsage(data.usage);
-        showVerdict(out, data.verdict, { lockedLabel: 'Pro & up', focus: !fromQr });
-        watch.done();
-        $('[data-left]', el).textContent = scanLeftText(mode);
-      } catch (err) {
-        watch.fail();
-        out.innerHTML = friendlyError(err);
+        if (r.url) await runLink(r, fromQr);
+        else if (r.path === '/scan/text') await runText(r);
+        else if (r.path === '/scan/email') await runEmail();
+        else if (r.path === '/scan/file') await runFile();
+      } finally {
+        running = false;
+        last = { key, at: performance.now() };
+        refresh();
       }
     }
 
-    const preset = params.get('url');
-    if (preset) {
-      form.url.value = preset;
-      if (!history.state || history.state.scanned !== preset) form.requestSubmit();
+    async function runLink(r, fromQr) {
+      // Remembered in the history entry, so Back and reload show the address without spending another scan.
+      history.replaceState({ scanned: r.url }, '', `/app/check?url=${encodeURIComponent(r.url)}`);
+      const deep = r.mode === 'delicate';
+      // A delicate scan digs: quiet binary behind the wait while the site is researched (binary.js).
+      const watch = watchScan(out, linkSteps(deep), { dig: deep });
+      try {
+        const data = await busy(go, fromQr ? 'Checking the link in the code' : 'Checking', () => api(r.path, { method: 'POST', body: r.path === '/scan/link' ? { url: r.url, mode: r.mode } : { url: r.url }, onStage: watch.onStage }));
+        applyUsage(data.usage);
+        showVerdict(out, data.verdict, { lockedLabel: 'Pro & up', focus: !fromQr });
+        watch.done();
+      } catch (err) { watch.fail(); out.innerHTML = friendlyError(err); }
     }
+
+    async function runText(r) {
+      history.replaceState(null, '', '/app/check');
+      // An email checked as a message: its subject and words, from its sender.
+      const mail = r.kind === 'email' ? parseEmail(box.value) : null;
+      const from = mail ? mail.from.slice(0, 80) : $('[name=from]', form).value.trim();
+      // An email's QR code goes in with its words, so a link in the code is checked with the email's own links.
+      const all = mail ? [mail.subject, mail.body, ...pictureQr.map((q) => `QR code in the email: ${q}`)].filter(Boolean).join('\n\n') : box.value;
+      // A long conversation is read up to TEXT_MAX letters: its start (how it began) and its most recent part (where it is now).
+      const cut = all.length > TEXT_MAX;
+      const text = cut ? `${all.slice(0, 10000)}\n${all.slice(-(TEXT_MAX - 10001))}` : all;
+      const watch = watchScan(out, TEXT_STEPS, { note: 'Read in memory only: never kept, and not in your history.' });
+      try {
+        const data = await busy(go, 'Checking', () => api('/scan/text', { method: 'POST', body: { from, text }, onStage: watch.onStage }));
+        applyUsage(data.usage);
+        out.innerHTML = textResult(data.text, from)
+          + (cut ? `<p class="field__hint u-mt-sm">This conversation is very long, so Sentinel read its first part and its most recent ${(TEXT_MAX - 10000).toLocaleString('en')} letters.</p>` : '');
+        riseMask(out);
+        watch.done();
+        wireWarn(out, () => window.SentinelWarnCard.fromText(data.text, from, $('[data-text-result]', out).dataset.textResult));
+        const heading = $('h2', out);
+        if (heading) { heading.tabIndex = -1; heading.focus({ preventScroll: true }); }
+        out.scrollIntoView({ behavior: glide(), block: 'start' });
+      } catch (err) { watch.fail(); out.innerHTML = friendlyError(err); }
+    }
+
+    async function runEmail() {
+      history.replaceState(null, '', '/app/check');
+      const m = parseEmail(box.value);
+      // What Sentinel reads of an email (server/routes/scan.routes.js cleanMail): a 5 MB paste is cut here, so it is
+      // checked instead of being refused as too large to send.
+      const body = m.body.slice(0, 20000);
+      // Typed or read from a screenshot, an address may have no scheme: "www.example.com/login" is a link too.
+      const found = [...(body.match(/https?:\/\/[^\s<>"')]+/g) || []), ...(body.match(/(?<![\w./@-])www\.[a-z0-9.-]+\.[a-z]{2,}[^\s<>"')]*/gi) || []).map((u) => `https://${u}`)];
+      const payload = {
+        from: m.from, replyTo: m.replyTo, subject: m.subject, body, links: [...new Set(found)].map((href) => ({ href, text: '' })),
+        attachments: m.attachments, qr: pictureQr, headers: m.headers.slice(0, 16000)
+      };
+      const watch = watchScan(out, EMAIL_STEPS);
+      try {
+        const data = await busy(go, 'Checking', () => api('/scan/email', { method: 'POST', body: payload, onStage: watch.onStage }));
+        applyUsage(data.usage);
+        showVerdict(out, data.verdict, { focus: true });
+        watch.done();
+        showProof(out, data.verdict.sender);
+        showMarks(out, payload, data.verdict.checklist.items);
+      } catch (err) { watch.fail(); out.innerHTML = friendlyError(err); }
+    }
+
+    async function runFile() {
+      history.replaceState(null, '', '/app/check');
+      const watch = watchScan(out, FILE_STEPS, { note: `${file.name} · ${bytes(file.size)}` });
+      drop.setAttribute('aria-busy', 'true');
+      try {
+        const data = await busy(go, 'Checking', () => api('/scan/file', { method: 'POST', raw: file, headers: { 'X-File-Name': encodeURIComponent(file.name), 'Content-Type': 'application/octet-stream' }, onStage: watch.onStage }));
+        applyUsage(data.usage);
+        showVerdict(out, data.verdict, { focus: true });
+        watch.done();
+      } catch (err) { watch.fail(); out.innerHTML = friendlyError(err); }
+      drop.removeAttribute('aria-busy');
+    }
+
+    /** A QR code's text: what it does, and a link in it checked with a fast scan, so test pictures never use up delicate ones. */
+    async function fromCode(code) {
+      const info = await explainQr(qrOut, code, { focus: true });
+      if (!info || !info.url) return;
+      file = null;
+      showFile();
+      box.value = info.url;
+      choice = null;
+      await run(Route.pick({ text: info.url }, { features: f }), { fromQr: true });
+    }
+
+    /**
+     * A picture: a QR code in it is read on this device and checked; otherwise its words are read by the Windows app
+     * (never uploaded) and put in the box to look over before Check is pressed.
+     */
+    let reading = false;
+    // A QR code read from a screenshot of an email, sent with that email. Typing or pasting another one forgets it.
+    let pictureQr = [];
+    // Words read from a picture: a screenshot has no headers to paste, so the how-to for them is not shown.
+    let pictured = false;
+    async function readPicture(pic) {
+      if (reading) return;
+      if (pic.size > 20 * 1024 * 1024) { toast('That picture is too large.', 'error'); return; }
+      reading = true;
+      qrOut.innerHTML = '';
+      const url = URL.createObjectURL(pic);
+      $('img', preview).src = url;
+      preview.hidden = false;
+      preview.classList.add('is-reading');
+      shotStatus.textContent = 'Looking for a QR code in the picture…';
+      pictureQr = [];
+      try {
+        let code = null;
+        try { code = await qrFromFile(pic); } catch { /* no reader, or not a picture this browser opens: said below */ }
+        // The words are read too where the Windows app can, so a code inside a screenshot of an email is judged with
+        // that email, as one answer, and not on a card of its own.
+        const canRead = Boolean(desktop && desktop.readScreenshot) && /^image\/(png|jpeg)$/.test(pic.type);
+        let raw = '';
+        if (code != null && canRead) {
+          shotStatus.textContent = 'Reading the words in the picture…';
+          try { raw = joinSlices(await desktop.readScreenshot(await sliceImage(pic))); } catch { raw = ''; }
+        }
+        const mailed = raw.trim() && (withSender(raw) !== raw || /^(from|sender)\s*:/im.test(raw));
+        if (code != null && !mailed) {
+          shotStatus.textContent = 'The QR code in this picture was read and checked below.';
+          await fromCode(code);
+          return;
+        }
+        if (code != null) {
+          // Only the code's text goes with the email, and never a secret in it (SentinelQR.redact).
+          pictureQr = [window.SentinelQR.redact(code)];
+          box.value = withSender(raw);
+          choice = 'email';
+          file = null;
+          showFile();
+          pictured = true;
+        box.dispatchEvent(new Event('input', { bubbles: true }));
+          shotStatus.textContent = 'Read on this computer, with the QR code in it. Look over the words, then press Check: the code is checked with the email.';
+          box.focus();
+          return;
+        }
+        if (!/^image\/(png|jpeg)$/.test(pic.type)) {
+          // Said where the answer would be, and kept there: a HEIC photo shared from a phone otherwise left an empty page.
+          qrOut.innerHTML = stateBlock('unavailable', 'Take a screenshot of it and share or choose that instead, or copy the message and paste it here.', { title: 'This picture is not a PNG or JPEG, so Sentinel cannot read it', small: true }).replace('<div ', '<div role="alert" data-shot-wrong ');
+          shotStatus.textContent = 'No QR code was found in this picture.';
+          return;
+        }
+        if (!desktop || !desktop.readScreenshot) {
+          shotStatus.textContent = 'No QR code was found. The words in a picture are read by the Sentinel app for Windows, so they cannot be read here. Copy the message itself and paste it here.';
+          return;
+        }
+        shotStatus.textContent = 'Reading the words in the picture…';
+        raw = joinSlices(await desktop.readScreenshot(await sliceImage(pic)));
+        if (!raw.trim()) { shotStatus.textContent = 'No words were found in this picture.'; return; }
+        // An address near the top is an email's sender; otherwise it is a phone's messages (textshot.js).
+        const mail = withSender(raw);
+        if (mail !== raw || /^(from|sender)\s*:/im.test(raw)) {
+          box.value = mail;
+          choice = 'email';
+        } else {
+          const m = window.SentinelTextShot.read(raw);
+          box.value = m.text || raw;
+          $('[name=from]', form).value = m.from || '';
+          choice = null;
+        }
+        file = null;
+        showFile();
+        pictured = true;
+        box.dispatchEvent(new Event('input', { bubbles: true }));
+        shotStatus.textContent = 'Read on this computer. Look over the words, then press Check.';
+        box.focus();
+      } catch (err) {
+        shotStatus.textContent = desktopError(err);
+      } finally {
+        reading = false;
+        preview.classList.remove('is-reading');
+        URL.revokeObjectURL(url);
+      }
+    }
+
+    box.addEventListener('input', (ev) => {
+      // Emptied, or something else pasted in: a new thing to check, without the last picture's code. A word corrected
+      // in what was read keeps it.
+      if (!box.value.trim()) { choice = null; pictureQr = []; pictured = false; }
+      if (ev.inputType === 'insertFromPaste' || ev.inputType === 'insertFromDrop') { pictureQr = []; pictured = false; }
+      refresh();
+    });
+    // Enter sends a link pasted on its own; in a message it starts a new line, and Ctrl+Enter sends.
+    box.addEventListener('keydown', (ev) => {
+      if (ev.key !== 'Enter' || ev.shiftKey || ev.isComposing) return;
+      if (ev.ctrlKey || ev.metaKey || Route.isLink(box.value.trim())) { ev.preventDefault(); form.requestSubmit(); }
+    });
+    // An example of each thing the box takes, put in the box (or, for a file, a small harmless one made here) so the
+    // sentence under it shows how Sentinel reads it. Nothing is sent until Check is pressed.
+    tryEl.addEventListener('click', (ev) => {
+      const b = ev.target.closest('[data-example]');
+      if (!b || running) return;
+      const kind = b.dataset.example;
+      if (kind === 'file') { take(new File(['An example file made by Sentinel. It holds only these words.\n'], 'Invoice_2026.pdf.exe', { type: 'application/octet-stream' })); return; }
+      box.value = CHECK_EXAMPLES[kind];
+      choice = null;
+      box.dispatchEvent(new Event('input', { bubbles: true }));
+      box.focus();
+    });
+    asEl.addEventListener('click', (ev) => { const b = ev.target.closest('[data-kind]'); if (b) { choice = b.dataset.kind; refresh(); } });
+    deeperBtn.addEventListener('click', () => {
+      deeper = !deeper;
+      try { localStorage.setItem(deeperKey, deeper ? 'delicate' : 'fast'); } catch { /* not kept */ }
+      refresh();
+    });
+    chip.addEventListener('click', (ev) => {
+      if (!ev.target.closest('[data-unfile]') || running) return;
+      file = null;
+      showFile();
+      refresh();
+      box.focus();
+    });
+    $('[data-add]', el).addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', () => { take(fileInput.files[0]); fileInput.value = ''; });
+    ['dragenter', 'dragover'].forEach((t) => el.addEventListener(t, (ev) => {
+      if (ev.dataTransfer && [...ev.dataTransfer.types].includes('Files')) { ev.preventDefault(); drop.classList.add('is-over'); }
+    }));
+    el.addEventListener('dragleave', (ev) => { if (!el.contains(ev.relatedTarget)) drop.classList.remove('is-over'); });
+    el.addEventListener('drop', (ev) => {
+      drop.classList.remove('is-over');
+      const dropped = ev.dataTransfer && ev.dataTransfer.files[0];
+      if (!dropped) return;
+      ev.preventDefault();
+      if (running) { toast('One check at a time. This one is still running.', 'info'); return; }
+      take(dropped);
+    });
+    // Ctrl+V with a picture on the clipboard (a Snipping Tool capture, say). Pasted text is left to the box: a copy
+    // from Excel or Word carries a picture of itself too, and pasted into a text box it is the text that is meant.
+    const onPaste = (ev) => {
+      if (!el.isConnected) { document.removeEventListener('paste', onPaste); return; }
+      const items = [...(ev.clipboardData ? ev.clipboardData.items : [])];
+      const typing = ev.target && ev.target.closest && ev.target.closest('input, textarea, [contenteditable]');
+      if (typing && items.some((i) => i.kind === 'string' && i.type === 'text/plain')) return;
+      const item = items.find((i) => i.kind === 'file' && /^image\//.test(i.type));
+      if (item) { ev.preventDefault(); readPicture(item.getAsFile()); }
+    };
+    document.addEventListener('paste', onPaste);
+    form.addEventListener('submit', (ev) => { ev.preventDefault(); run(refresh()); });
+
+    // The camera: on only while its view is open, looked at a few times a second, off the moment a code is found.
+    const camBtn = $('[data-qr-cam]', el);
+    if (camBtn) {
+      const camView = $('[data-qr-camview]', el);
+      const video = $('video', camView);
+      let stream = null;
+      let timer = null;
+      const stop = () => {
+        clearInterval(timer);
+        timer = null;
+        if (stream) stream.getTracks().forEach((t) => t.stop());
+        stream = null;
+        video.srcObject = null;
+        camView.hidden = true;
+        camBtn.setAttribute('aria-expanded', 'false');
+      };
+      camBtn.addEventListener('click', async () => {
+        if (stream) { stop(); return; }
+        try { await qrEngine(); } catch (err) { toast(err.message, 'error'); return; }
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+        } catch {
+          stream = null;
+          toast('The camera could not be started. Check that one is connected and that apps are allowed to use it.', 'error', 6000);
+          return;
+        }
+        camView.hidden = false;
+        camBtn.setAttribute('aria-expanded', 'true');
+        video.srcObject = stream;
+        try { await video.play(); } catch { /* it plays when it can */ }
+        timer = setInterval(async () => {
+          if (!el.isConnected) { stop(); return; }
+          if (reading || !video.videoWidth) return;
+          const text = qrFrom(video, video.videoWidth, video.videoHeight, [Math.min(640, Math.max(video.videoWidth, video.videoHeight))]);
+          if (text == null) return;
+          stop();
+          reading = true;
+          try { await fromCode(text); } finally { reading = false; }
+        }, 350);
+      });
+    }
+
+    // A file chosen with "Scan with Sentinel" in the Windows right-click menu, handed over once by the app: checked at once.
+    if (desktop && desktop.takeMenuFile) desktop.takeMenuFile().then(async (m) => {
+      if (!m || !el.isConnected) return;
+      if (await take(new File([m.data], m.name))) run(refresh());
+    }, () => toast('That file could not be opened. Drop it here instead.', 'error'));
+
+    // After the drafts are put back (render), so an old draft never takes the place of what was handed over: a link in
+    // the address (Back and reload show it without spending another scan), or what the Overview box, the palette or the
+    // phone's Share menu sent here.
+    const handed = shared;
+    shared = null;
+    Promise.resolve().then(() => {
+      if (preset) {
+        box.value = preset;
+        choice = null;
+        refresh();
+        if (!history.state || history.state.scanned !== preset) form.requestSubmit();
+      } else if (handed && handed.text) {
+        box.value = handed.text;
+        $('[name=from]', form).value = '';
+        choice = null;
+        box.dispatchEvent(new Event('input', { bubbles: true }));
+        form.requestSubmit();
+      } else if (handed && handed.image) {
+        refresh();
+        readPicture(handed.image);
+        preview.scrollIntoView({ block: 'center', behavior: glide() });
+      } else refresh();
+    });
   }
 
   /* ------------------------------------------------------------ QR codes */
@@ -1013,19 +1506,6 @@
   // A picture of a QR code is read in this page (qr.js), never uploaded. Only the text it holds goes to the server,
   // which says what the code does: a link, or something that is not a link at all (a sign-in code, a wallet
   // connection, a crypto payment) and would never show up in a link scan.
-
-  function qrPicker() {
-    const camera = Boolean(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
-    return `<div class="qr-in" data-qr>
-        <span class="qr-in__icon">${ICON.qr}</span>
-        <div class="qr-in__text"><b>Got a QR code?</b><span>Choose, drop or paste (Ctrl+V) a picture of it${camera ? ', or hold it up to the camera' : ''}. It is read on this device and not uploaded.</span></div>
-        <span class="qr-in__btns">
-          <button class="btn btn--sm" type="button" data-qr-pick>Choose a picture</button><input type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/bmp" aria-label="Picture of a QR code" data-qr-file hidden>
-          ${camera ? '<button class="btn btn--sm" type="button" data-qr-cam>Use the camera</button>' : ''}
-        </span>
-        <div class="qr-cam" data-qr-camview hidden><video muted playsinline aria-label="Camera view"></video><p class="muted">Hold the QR code up to the camera. It is read here, and the camera turns off as soon as a code is found.</p></div>
-      </div>`;
-  }
 
   /**
    * The text of a QR code in an image or a video frame, or null. A picture is tried at two sizes, large first, then
@@ -1103,92 +1583,6 @@
     }
   }
 
-  /** A picture chosen, dropped or pasted, or the camera, each ending in onText(the code's text). */
-  function wireQr(el, onText) {
-    const box = $('[data-qr]', el);
-    let reading = false;
-    const fromFile = async (file) => {
-      if (!file || reading) return;
-      if (!/^image\//.test(file.type)) { toast('Choose a picture of the QR code: PNG, JPEG, WebP, GIF or BMP.', 'error'); return; }
-      if (file.size > 20 * 1024 * 1024) { toast('That picture is too large.', 'error'); return; }
-      reading = true;
-      try {
-        const text = await qrFromFile(file);
-        if (text == null) toast('No QR code was found in that picture. Try a closer, sharper picture with the whole code in it.', 'info', 6000);
-        else await onText(text);
-      } catch (err) {
-        toast(qrLoad === null && !window.SentinelQR ? 'The QR code reader could not load. Try again in a moment.' : 'That picture could not be read.', 'error');
-      } finally { reading = false; }
-    };
-    const input = $('[data-qr-file]', box);
-    // A real button, so the keyboard reaches it; the file input itself stays out of the way.
-    $('[data-qr-pick]', box).addEventListener('click', () => input.click());
-    input.addEventListener('change', () => { fromFile(input.files[0]); input.value = ''; });
-    ['dragenter', 'dragover'].forEach((t) => el.addEventListener(t, (ev) => {
-      if (ev.dataTransfer && [...ev.dataTransfer.types].includes('Files')) { ev.preventDefault(); box.classList.add('is-over'); }
-    }));
-    el.addEventListener('dragleave', (ev) => { if (!el.contains(ev.relatedTarget)) box.classList.remove('is-over'); });
-    el.addEventListener('drop', (ev) => {
-      const file = ev.dataTransfer && ev.dataTransfer.files[0];
-      box.classList.remove('is-over');
-      if (!file) return;
-      ev.preventDefault();
-      fromFile(file);
-    });
-    // Ctrl+V with a picture on the clipboard (a Snipping Tool capture, say). Pasted text is left to the page: a copy
-    // from Excel or Word carries a picture of itself too, and pasted into a text box it is the text that is meant.
-    const onPaste = (ev) => {
-      if (!el.isConnected) { document.removeEventListener('paste', onPaste); return; }
-      const items = [...(ev.clipboardData ? ev.clipboardData.items : [])];
-      const typing = ev.target && ev.target.closest && ev.target.closest('input, textarea, [contenteditable]');
-      if (typing && items.some((i) => i.kind === 'string' && i.type === 'text/plain')) return;
-      const item = items.find((i) => i.kind === 'file' && /^image\//.test(i.type));
-      if (item) { ev.preventDefault(); fromFile(item.getAsFile()); }
-    };
-    document.addEventListener('paste', onPaste);
-
-    // The camera: on only while its view is open, looked at a few times a second, off the moment a code is found.
-    const camBtn = $('[data-qr-cam]', box);
-    if (!camBtn) return;
-    const camView = $('[data-qr-camview]', box);
-    const video = $('video', camView);
-    let stream = null;
-    let timer = null;
-    const stop = () => {
-      clearInterval(timer);
-      timer = null;
-      if (stream) stream.getTracks().forEach((t) => t.stop());
-      stream = null;
-      video.srcObject = null;
-      camView.hidden = true;
-      camBtn.textContent = 'Use the camera';
-    };
-    camBtn.addEventListener('click', async () => {
-      if (stream) { stop(); return; }
-      try { await qrEngine(); } catch (err) { toast(err.message, 'error'); return; }
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
-      } catch {
-        stream = null;
-        toast('The camera could not be started. Check that one is connected and that apps are allowed to use it.', 'error', 6000);
-        return;
-      }
-      camView.hidden = false;
-      camBtn.textContent = 'Stop the camera';
-      video.srcObject = stream;
-      try { await video.play(); } catch { /* it plays when it can */ }
-      timer = setInterval(async () => {
-        if (!el.isConnected) { stop(); return; }
-        if (reading || !video.videoWidth) return;
-        const text = qrFrom(video, video.videoWidth, video.videoHeight, [Math.min(640, Math.max(video.videoWidth, video.videoHeight))]);
-        if (text == null) return;
-        stop();
-        reading = true;
-        try { await onText(text); } finally { reading = false; }
-      }, 350);
-    });
-  }
-
   const REPORT_CATEGORIES = [
     ['phishing', 'Phishing / fake login'], ['fake_store', 'Fake shop'], ['crypto_scam', 'Crypto scam'], ['tech_support_scam', 'Tech support scam'],
     ['investment_scam', 'Investment scam'], ['romance_scam', 'Romance scam'], ['impersonation', 'Impersonates a brand or person'], ['malware', 'Spreads malware'], ['other', 'Something else']
@@ -1209,7 +1603,7 @@
       </span>
       <form class="report" data-report-form data-draft="report:${esc(v.url)}" hidden>
         <div class="row2">
-          <div class="field"><label for="rp-cat">What kind of site is it?</label><select class="input" id="rp-cat" name="category">${REPORT_CATEGORIES.map(([id, label]) => `<option value="${id}">${label}</option>`).join('')}</select></div>
+          <div class="field"><label for="rp-cat">What kind of site is it?</label><select class="input" id="rp-cat" name="category">${(canWarn(window.UI.headline(v).tone) ? [['false_alarm', 'It is safe: Sentinel got this wrong']] : []).concat(REPORT_CATEGORIES).map(([id, label]) => `<option value="${id}">${label}</option>`).join('')}</select></div>
           <div class="field"><label for="rp-note">Anything else? <span class="opt">(optional)</span></label><input class="input" id="rp-note" name="note" maxlength="500" placeholder="How did you come across it?"></div>
         </div>
         <div class="report__foot"><span class="muted">Three reports from different accounts confirm a site for everyone.</span><button class="btn btn--gold btn--sm" type="submit">Send report</button></div>
@@ -1232,7 +1626,8 @@
       busy($('button[type=submit]', form), 'Sending', async () => {
         try {
           const r = await api('/report', { method: 'POST', body: { url: v.url, category: form.category.value, note: form.note.value } });
-          toast(r.promoted ? 'Reported. This site is now confirmed for everyone.' : `Thanks. ${r.reports} report${r.reports === 1 ? '' : 's'} so far.`, 'success');
+          toast(form.category.value === 'false_alarm' ? 'Sent, thank you. On its own a report changes no one’s result. Trust this site to stop its warning for you.'
+            : r.promoted ? 'Reported. This site is now confirmed for everyone.' : `Thanks. ${r.reports} report${r.reports === 1 ? '' : 's'} so far.`, 'success');
           form.hidden = true;
           report.disabled = true;
           report.textContent = 'Reported';
@@ -1307,268 +1702,7 @@
       row.appendChild(panel);
       btn.setAttribute('aria-expanded', 'true');
       $('a, button', panel).focus({ preventScroll: true });
-      panel.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'nearest' });
-    });
-  }
-
-  /* ====================================================== virus & malware */
-
-  function threatsView(el, params) {
-    const f = plan().features;
-    const mode = params.get('mode') === 'url' ? 'url' : 'file';
-    el.innerHTML = `
-      ${localNote()}
-      ${title('Virus &amp; malware scan', `Check a file or download link for viruses and malware. ${f.research ? 'Links are researched and downloaded files are inspected.' : 'Files are fully inspected; links get the checklist without research.'}`,
-        `<div class="segmented" role="tablist"><button role="tab" data-mode="file" aria-selected="${mode === 'file'}">File</button><button role="tab" data-mode="url" aria-selected="${mode === 'url'}">Link</button></div>`)}
-      ${modelSlot(true)}
-      <div data-input></div>
-      <div class="scan-meta"><span data-left>${left('fileScans')} of ${usage().fileScans.limit} scans left this week</span><span>Files up to 25 MB &middot; nothing is stored</span></div>
-      <div data-out></div>`;
-
-    $$('[data-mode]', el).forEach((b) => b.addEventListener('click', () => navigate(`/app/threats?mode=${b.dataset.mode}`)));
-    mountModels(el);
-    const input = $('[data-input]', el);
-    const out = $('[data-out]', el);
-    const updateLeft = () => { $('[data-left]', el).textContent = `${left('fileScans')} of ${usage().fileScans.limit} scans left this week`; };
-
-    if (mode === 'url') {
-      input.innerHTML = `<form class="scanbox" data-form>${ICON.search}<input name="url" type="text" inputmode="url" autocomplete="off" spellcheck="false" placeholder="Paste a download link or web address" aria-label="Link to scan" required><button class="btn btn--gold" type="submit">Scan</button></form>`;
-      const form = $('[data-form]', input);
-      form.addEventListener('submit', async (ev) => {
-        ev.preventDefault();
-        const watch = watchScan(out, linkSteps(f.research), { dig: f.research });
-        try {
-          const data = await busy($('button', form), 'Scanning', () => api('/scan/threat', { method: 'POST', body: { url: form.url.value.trim() }, onStage: watch.onStage }));
-          applyUsage(data.usage);
-          updateLeft();
-          showVerdict(out, data.verdict);
-          watch.done();
-        } catch (err) { watch.fail(); out.innerHTML = friendlyError(err); }
-      });
-      return;
-    }
-
-    input.innerHTML = `<label class="drop" data-drop>
-      <input type="file" data-file aria-label="Choose a file to scan">
-      <div><div class="drop__icon">${ICON.upload}</div><h2>Drop a file here, or click to choose</h2><p>Programs, documents, archives, scripts, installers</p></div>
-    </label>`;
-    const drop = $('[data-drop]', input);
-    const fileInput = $('[data-file]', input);
-    // One file at a time: a second drop while one is being checked would start a second scan and use a second
-    // scan from the allowance.
-    let scanning = false;
-    const scanFile = async (file) => {
-      if (!file) return;
-      if (scanning) { toast('One file at a time. This one is still being checked.', 'info'); return; }
-      if (file.size > 25 * 1024 * 1024) { toast('Files up to 25 MB can be scanned.', 'error'); return; }
-      scanning = true;
-      drop.setAttribute('aria-busy', 'true');
-      const watch = watchScan(out, FILE_STEPS, { note: `${file.name} · ${bytes(file.size)}` });
-      try {
-        const data = await api('/scan/file', { method: 'POST', raw: file, headers: { 'X-File-Name': encodeURIComponent(file.name), 'Content-Type': 'application/octet-stream' }, onStage: watch.onStage });
-        applyUsage(data.usage);
-        updateLeft();
-        showVerdict(out, data.verdict, { focus: true });
-        watch.done();
-      } catch (err) { watch.fail(); out.innerHTML = friendlyError(err); }
-      fileInput.value = '';
-      scanning = false;
-      drop.removeAttribute('aria-busy');
-    };
-    fileInput.addEventListener('change', () => scanFile(fileInput.files[0]));
-    ['dragenter', 'dragover'].forEach((t) => drop.addEventListener(t, (ev) => { ev.preventDefault(); drop.classList.add('is-over'); }));
-    ['dragleave', 'drop'].forEach((t) => drop.addEventListener(t, (ev) => { ev.preventDefault(); drop.classList.remove('is-over'); }));
-    drop.addEventListener('drop', (ev) => scanFile(ev.dataTransfer.files[0]));
-    // A file chosen with "Scan with Sentinel" in the Windows right-click menu, handed over once by the app.
-    if (desktop && desktop.takeMenuFile) desktop.takeMenuFile().then((m) => {
-      if (!m || !el.isConnected) return;
-      scanFile(new File([m.data], m.name));
-      // The answer is what the person came for: below the drop zone it was out of sight.
-      out.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
-    },() => toast('That file could not be opened. Drop it here instead.', 'error'));
-  }
-
-  /* ========================================================= email scan */
-
-  function emailView(el) {
-    const f = plan().features;
-    if (!f.emailManual) {
-      el.innerHTML = `${title('Email scan', 'Paste a suspicious email and Sentinel checks the sender, wording, every link and every attachment.')}
-        ${lockedCard({ tag: 'Max', heading: 'Scan any email you paste in, or a screenshot of one', body: `Pasting emails and screenshots in is part of Sentinel Max. ${f.emailLive ? 'Your Pro plan already marks emails automatically in Gmail and Outlook through the Sentinel app.' : 'Pro, Max and Ultimate also mark emails automatically in Gmail and Outlook.'}`, actions: `<a class="btn btn--gold" href="/app/plan">${state.config.billingMode === 'demo' ? 'Upgrade to Max' : 'See the plans'}</a>` })}`;
-      return;
-    }
-    el.innerHTML = `
-      ${title('Email scan', 'Paste what you see in your inbox. Every link and the sender\'s domain go through the full link pipeline too.',
-        '<div class="segmented" role="tablist"><button role="tab" data-emode="fields" aria-selected="true">Fill in</button><button role="tab" data-emode="paste" aria-selected="false">Paste whole email</button><button role="tab" data-emode="shot" aria-selected="false">Screenshot</button></div>')}
-      ${modelSlot(true)}
-      <div class="panel" data-shot hidden>
-        <label class="drop" data-shot-drop>
-          <input type="file" accept="image/png,image/jpeg" data-shot-file aria-label="Choose a screenshot of the email">
-          <div><div class="drop__icon">${ICON.upload}</div><h3>Drop a screenshot of the email, or click to choose</h3><p>Or press Ctrl+V to paste one. PNG or JPEG. A QR code in it is read too.</p></div>
-        </label>
-        <figure class="shot" data-shot-preview hidden><img alt="The screenshot to read"><figcaption data-shot-status></figcaption></figure>
-        <p class="field__hint u-mt-sm">${desktop && desktop.readScreenshot
-          ? 'Read on this computer by Windows. The image is not uploaded or kept. Links are read as they appear on screen, so a link whose words differ from where it really goes is best pasted as text.'
-          : 'Screenshots are read on your own computer by the Sentinel app for Windows, so they never have to be uploaded. <a class="u-gold" href="/download">Get the app</a>'}</p>
-      </div>
-      <form class="panel" data-paste data-draft="email-paste" hidden>
-        <div class="field"><label for="e-raw">Paste the whole email, headers and all</label><textarea class="textarea" id="e-raw" name="raw" rows="10" placeholder="From: PayPal Security <alerts@example.com>&#10;Subject: Your account is limited&#10;&#10;Dear customer, ..."></textarea><span class="field__hint">Sentinel picks out the sender, reply-to, subject and links, then fills the form for you to check. With its headers, it also shows who really sent it.</span></div>
-        <div data-header-help>
-          <p class="field__hint"><b>Gmail:</b> open the email, click the three dots, choose Show original, then Copy to clipboard.</p>
-          <p class="field__hint"><b>Outlook:</b> open the email, click the three dots, choose View, then View message source, and copy it all.</p>
-        </div>
-        <div class="report__foot"><span><button class="btn" type="button" data-eml-open>Open an .eml file</button><input type="file" accept=".eml,message/rfc822" data-eml hidden></span><button class="btn btn--gold" type="button" data-parse>Read this email</button></div>
-      </form>
-      <form class="panel" data-form data-draft="email-scan">
-        <div data-email-qr></div>
-        <div class="row2">
-          <div class="field"><label for="e-from">From</label><input class="input" id="e-from" name="from" dir="auto" placeholder="PayPal Security &lt;alerts@example.com&gt;" autocomplete="off"></div>
-          <div class="field"><label for="e-reply">Reply-to <span class="opt">(optional)</span></label><input class="input" id="e-reply" name="replyTo" autocomplete="off"></div>
-        </div>
-        <div class="field"><label for="e-subject">Subject</label><input class="input" id="e-subject" name="subject" dir="auto" autocomplete="off"></div>
-        <div class="field"><label for="e-body">Message</label><textarea class="textarea" id="e-body" name="body" placeholder="Paste the message text, including any links"></textarea></div>
-        <div class="field"><label for="e-att">Attachment names <span class="opt">(optional, comma separated)</span></label><input class="input" id="e-att" name="attachments" placeholder="Invoice_2026.pdf.exe, statement.zip" autocomplete="off"></div>
-        <div class="report__foot">
-          <span class="muted">Uses 1 of your ${left('deepScans')} remaining delicate scans. Nothing is stored.</span>
-          <button class="btn btn--gold" type="submit">Scan email</button>
-        </div>
-      </form>
-      <div data-out></div>`;
-
-    mountModels(el);
-    const form = $('[data-form]', el);
-    const out = $('[data-out]', el);
-    const pasteBox = $('[data-paste]', el);
-    const shotBox = $('[data-shot]', el);
-    $$('[data-emode]', el).forEach((b) => b.addEventListener('click', () => {
-      $$('[data-emode]', el).forEach((x) => x.setAttribute('aria-selected', String(x === b)));
-      pasteBox.hidden = b.dataset.emode !== 'paste';
-      shotBox.hidden = b.dataset.emode !== 'shot';
-      // Pasting a whole email starts another one: a code from an earlier screenshot does not go with it.
-      if (!pasteBox.hidden) { forgetShotQr(); $('textarea', pasteBox).focus(); }
-    }));
-    // The sender-check headers of the email last pasted or opened, sent with its scan while its From is unchanged.
-    // Not kept in the draft.
-    let pasted = { from: '', headers: '' };
-    const fill = (raw) => {
-      const m = parseEmail(raw);
-      pasted = { from: m.from, headers: m.headers };
-      form.from.value = m.from; form.replyTo.value = m.replyTo; form.subject.value = m.subject; form.body.value = m.body; form.attachments.value = m.attachments.join(', ');
-      $$('[data-emode]', el).forEach((x) => x.setAttribute('aria-selected', String(x.dataset.emode === 'fields')));
-      pasteBox.hidden = true;
-      shotBox.hidden = true;
-      // Filled in by script, which raises no input event: say so, so the draft keeps what was filled in.
-      form.dispatchEvent(new Event('input', { bubbles: true }));
-      toast(m.from ? `Found sender ${m.from}. Check the fields, then scan.` : 'No headers found, so the text went into the message field.', 'info', 5000);
-      // The box just used is hidden now: the keyboard goes on to the fields to check, not back to the top of the page.
-      form.from.focus({ preventScroll: true });
-      form.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
-    };
-    $('[data-parse]', el).addEventListener('click', () => {
-      const raw = $('textarea', pasteBox).value;
-      if (raw.trim()) fill(raw);
-    });
-    // An .eml file (saved from Outlook or Thunderbird, or dragged out of one), read here as text like a paste.
-    const emlInput = $('[data-eml]', el);
-    const readEml = async (file) => {
-      if (!file) return;
-      if (!/\.eml$/i.test(file.name) && file.type !== 'message/rfc822') { toast('Choose an email saved as an .eml file.', 'error'); return; }
-      if (file.size > 10 * 1024 * 1024) { toast('That email is too large to read here.', 'error'); return; }
-      const raw = await file.text();
-      $('textarea', pasteBox).value = raw;
-      fill(raw);
-    };
-    $('[data-eml-open]', el).addEventListener('click', () => emlInput.click());
-    emlInput.addEventListener('change', () => { readEml(emlInput.files[0]); emlInput.value = ''; });
-    const rawBox = $('textarea', pasteBox);
-    rawBox.addEventListener('dragover', (ev) => { if ([...ev.dataTransfer.types].includes('Files')) ev.preventDefault(); });
-    rawBox.addEventListener('drop', (ev) => { if (ev.dataTransfer.files.length) { ev.preventDefault(); readEml(ev.dataTransfer.files[0]); } });
-
-    // A screenshot: cut into slices the recogniser can take (it has a maximum size), read on this computer, and
-    // put through the same reading as a pasted email.
-    const preview = $('[data-shot-preview]', el);
-    const shotStatus = $('[data-shot-status]', el);
-    // A QR code in the screenshot, read in this page whatever the computer: its text goes with the scan, so a link
-    // hidden in the code is checked with the email's other links, and a sign-in code is called what it is.
-    const qrSlot = $('[data-email-qr]', el);
-    let shotQr = [];
-    function forgetShotQr() { shotQr = []; qrSlot.innerHTML = ''; }
-    let reading = false;
-    const readShot = async (file) => {
-      if (!file || reading) return;
-      if (!/^image\/(png|jpeg)$/.test(file.type)) { toast('Screenshots must be PNG or JPEG images.', 'error'); return; }
-      if (file.size > 20 * 1024 * 1024) { toast('That screenshot is too large.', 'error'); return; }
-      const url = URL.createObjectURL(file);
-      $('img', preview).src = url;
-      preview.hidden = false;
-      forgetShotQr();
-      try {
-        const code = await qrFromFile(file);
-        if (code != null && await explainQr(qrSlot, code)) shotQr = [window.SentinelQR.redact(code)];
-      } catch { /* no code read: the text is still read below */ }
-      if (!desktop || !desktop.readScreenshot) { shotStatus.textContent = 'Reading screenshots needs the Sentinel app for Windows.'; return; }
-      reading = true;
-      preview.classList.add('is-reading');
-      shotStatus.textContent = 'Reading the screenshot…';
-      try {
-        const slices = await sliceImage(file);
-        const texts = await desktop.readScreenshot(slices);
-        const text = joinSlices(texts);
-        if (!text.trim()) { shotStatus.textContent = 'No text was found in that image.'; return; }
-        shotStatus.textContent = `Read ${text.split('\n').length} lines.`;
-        fill(withSender(text));
-      } catch (err) {
-        shotStatus.textContent = desktopError(err);
-      } finally {
-        reading = false;
-        preview.classList.remove('is-reading');
-        URL.revokeObjectURL(url);
-      }
-    };
-    const shotInput = $('[data-shot-file]', el);
-    shotInput.addEventListener('change', () => { readShot(shotInput.files[0]); shotInput.value = ''; });
-    const shotDrop = $('[data-shot-drop]', el);
-    ['dragenter', 'dragover'].forEach((t) => shotDrop.addEventListener(t, (ev) => { ev.preventDefault(); shotDrop.classList.add('is-over'); }));
-    ['dragleave', 'drop'].forEach((t) => shotDrop.addEventListener(t, (ev) => { ev.preventDefault(); shotDrop.classList.remove('is-over'); }));
-    shotDrop.addEventListener('drop', (ev) => readShot(ev.dataTransfer.files[0]));
-    // Ctrl+V with an image on the clipboard (a Snipping Tool capture, say), while the screenshot tab is open.
-    const onPaste = (ev) => {
-      if (!el.isConnected) { document.removeEventListener('paste', onPaste); return; }
-      if (shotBox.hidden) return;
-      const item = [...(ev.clipboardData ? ev.clipboardData.items : [])].find((i) => i.kind === 'file' && /^image\/(png|jpeg)$/.test(i.type));
-      if (item) { ev.preventDefault(); readShot(item.getAsFile()); }
-    };
-    document.addEventListener('paste', onPaste);
-
-    form.addEventListener('submit', async (ev) => {
-      ev.preventDefault();
-      if (![form.from, form.subject, form.body].some((x) => x.value.trim()) && !shotQr.length) {
-        toast('Paste the email you want checked, or at least its sender or message.', 'error');
-        form.body.focus();
-        return;
-      }
-      // What Sentinel reads of an email (server/routes/scan.routes.js cleanMail): a 5 MB paste is cut here, so it is
-      // scanned instead of being refused as too large to send.
-      const body = form.body.value.slice(0, 20000);
-      // Typed or read from a screenshot, an address may have no scheme: "www.example.com/login" is a link too.
-      const found = [...(body.match(/https?:\/\/[^\s<>"')]+/g) || []), ...(body.match(/(?<![\w./@-])www\.[a-z0-9.-]+\.[a-z]{2,}[^\s<>"')]*/gi) || []).map((u) => `https://${u}`)];
-      const links = [...new Set(found)].map((href) => ({ href, text: '' }));
-      const payload = {
-        from: form.from.value, replyTo: form.replyTo.value, subject: form.subject.value, body,
-        links, attachments: form.attachments.value.split(',').map((s) => s.trim()).filter(Boolean), qr: shotQr,
-        headers: pasted.headers && form.from.value === pasted.from ? pasted.headers.slice(0, 16000) : ''
-      };
-      const watch = watchScan(out, EMAIL_STEPS);
-      try {
-        const data = await busy($('button[type=submit]', form), 'Scanning', () => api('/scan/email', { method: 'POST', body: payload, onStage: watch.onStage }));
-        applyUsage(data.usage);
-        showVerdict(out, data.verdict);
-        watch.done();
-        showProof(out, data.verdict.sender);
-        showMarks(out, payload, data.verdict.checklist.items);
-        // Scanned with this email. The next email typed in here is another one, without this screenshot's code.
-        forgetShotQr();
-      } catch (err) { watch.fail(); out.innerHTML = friendlyError(err); }
+      panel.scrollIntoView({ behavior: glide(), block: 'nearest' });
     });
   }
 
@@ -1677,8 +1811,8 @@
 
   /* ======================================================= shared from a phone */
 
-  // The phone's Share menu opens /app/share (manifest.webmanifest share_target): a link goes to the link scan, words to
-  // the text scan (their links checked), a picture to the text scan's screenshot reader (share.js decides). The share
+  // The phone's Share menu opens /app/share (manifest.webmanifest share_target): a link, words or a picture go to the
+  // Check page, which checks them at once (share.js decides which). The share
   // box is emptied as it is read, so nothing shared stays on the device after this.
   function shareView(el, params) {
     el.innerHTML = `${title('Shared with Sentinel', 'Opening the right check for what you shared.')}<div data-out aria-live="polite"></div>`;
@@ -1694,171 +1828,21 @@
       const share = got || (q ? { title: q.get('title') || '', text: q.get('text') || '', url: q.get('url') || '', image: null } : null);
       const r = share ? Share.route({ ...share, image: Boolean(share.image) }) : { kind: 'empty' };
       const go = (href) => { history.replaceState({}, '', href); render(); };
-      if (r.kind === 'link') return go(`/app/scan?url=${encodeURIComponent(r.url)}`);
-      if (r.kind === 'text') { shared = { text: r.text }; return go('/app/text'); }
-      if (r.kind === 'image') { shared = { image: share.image }; return go('/app/text'); }
+      if (r.kind === 'link') return go(`/app/check?url=${encodeURIComponent(r.url)}`);
+      if (r.kind === 'text') { shared = { text: r.text }; return go('/app/check'); }
+      if (r.kind === 'image') { shared = { image: share.image }; return go('/app/check'); }
       const sub = $('.page-title p', el);
       if (sub) sub.textContent = 'Check a message or a link straight from another app.';
       $('[data-out]', el).innerHTML = `<div class="panel" data-share-empty>
         <p>${params.get('missed') ? 'What you shared did not reach Sentinel. Please share it once more.' : 'Nothing is waiting to be checked.'}
-          In Messages, WhatsApp, Gmail or your browser, press Share and choose Sentinel: a link opens in Link scan, a message in Text scan.</p>
+          In Messages, WhatsApp, Gmail or your browser, press Share and choose Sentinel: the link, message or picture opens in Check.</p>
         <p class="field__hint u-mt-sm" data-iphone-note>${esc(IPHONE_NOTE)}</p>
-        <p class="u-mt-sm"><a class="btn btn--sm" href="/app/text">Text scan</a> <a class="btn btn--sm" href="/app/scan">Link scan</a></p>
+        <p class="u-mt-sm"><a class="btn btn--sm" href="/app/check">Check something</a></p>
       </div>`;
     });
   }
 
-  /* ===================================================== text message scan */
-
-  // A text, WhatsApp message or DM, pasted in or read from a phone screenshot on this computer (the way the email scan
-  // reads one, then textshot.js picks out the sender and the messages). Judged on the server by the rules Phone Link
-  // checking uses (server/lib/scan/texts.js); links are checked by their address only. Nothing is kept.
-  // The most of a pasted conversation sent for a check (server/routes/scan.routes.js reads the same).
-  const TEXT_MAX = 40000;
-  function textView(el) {
-    const canRead = Boolean(desktop && desktop.readScreenshot);
-    const allowance = () => `${scanLeftText('fast')}. A text counts as one fast link scan, on every plan: its links are checked by their address only, not researched like a pasted email. Nothing is stored.`;
-    el.innerHTML = `
-      ${title('Text scan', 'Got a text, a WhatsApp message or a DM you are not sure about? Paste it in, or a screenshot of it, and Sentinel says if it looks like a scam and what to do. A whole conversation works too: Sentinel shows if it follows the steps of a slow scam.',
-        '<div class="segmented" role="tablist"><button role="tab" data-tmode="paste" aria-selected="true">Paste the text</button><button role="tab" data-tmode="shot" aria-selected="false">Screenshot</button></div>')}
-      <div class="panel" data-shot hidden>
-        <label class="drop" data-shot-drop>
-          <input type="file" accept="image/png,image/jpeg" data-shot-file aria-label="Choose a screenshot of the message">
-          <div><div class="drop__icon">${ICON.upload}</div><h3>Drop a screenshot from your phone, or click to choose</h3><p>Or press Ctrl+V to paste one. PNG or JPEG.</p></div>
-        </label>
-        <figure class="shot" data-shot-preview hidden><img alt="The screenshot to read"><figcaption data-shot-status></figcaption></figure>
-        <div data-text-qr></div>
-        <p class="field__hint u-mt-sm">${canRead
-          ? 'Read on this computer by Windows. The image is not uploaded or kept. A screenshot of a whole conversation works too.'
-          : 'Screenshots are read on your own computer by the Sentinel app for Windows, so they never have to be uploaded. <a class="u-gold" href="/download">Get the app</a>, or paste the text instead.'}</p>
-      </div>
-      ${iphone ? `<p class="field__hint" data-iphone-note>${esc(IPHONE_NOTE)}</p>` : ''}
-      <form class="panel" data-form data-draft="text-scan">
-        <div class="field"><label for="t-from">From <span class="opt">(optional: the number, short code or name the message shows)</span></label><input class="input" id="t-from" name="from" dir="auto" placeholder="+1 415 555 0199" autocomplete="off" maxlength="80"></div>
-        <div class="field"><label for="t-text">Message or conversation</label><textarea class="textarea" id="t-text" name="text" rows="6" placeholder="Paste the message, or the whole conversation, including any links"></textarea></div>
-        <div class="report__foot">
-          <span class="muted" data-left>${esc(allowance())}</span>
-          <button class="btn btn--gold" type="submit">Check this text</button>
-        </div>
-      </form>
-      <div data-out aria-live="polite"></div>`;
-
-    const form = $('[data-form]', el);
-    const out = $('[data-out]', el);
-    const shotBox = $('[data-shot]', el);
-    const setMode = (mode) => {
-      $$('[data-tmode]', el).forEach((x) => x.setAttribute('aria-selected', String(x.dataset.tmode === mode)));
-      shotBox.hidden = mode !== 'shot';
-      form.hidden = mode === 'shot';
-    };
-    $$('[data-tmode]', el).forEach((b) => b.addEventListener('click', () => setMode(b.dataset.tmode)));
-
-    const preview = $('[data-shot-preview]', el);
-    const shotStatus = $('[data-shot-status]', el);
-    let reading = false;
-    const readShot = async (file) => {
-      if (!file || reading) return;
-      const qrOut = $('[data-text-qr]', el);
-      if (!/^image\/(png|jpeg)$/.test(file.type)) {
-        // Said where the picture would be, and kept there: a HEIC photo shared from a phone otherwise left an empty page.
-        qrOut.innerHTML = `<div class="banner banner--error" role="alert" data-shot-wrong>This picture is not a PNG or JPEG, so Sentinel cannot read it. Take a screenshot of it and share or choose that instead, or copy the message and paste it in Message.</div>`;
-        toast('Screenshots must be PNG or JPEG images.', 'error');
-        return;
-      }
-      if (file.size > 20 * 1024 * 1024) { toast('That screenshot is too large.', 'error'); return; }
-      qrOut.innerHTML = '';
-      const url = URL.createObjectURL(file);
-      $('img', preview).src = url;
-      preview.hidden = false;
-      if (!canRead) {
-        // A phone (a picture shared to Sentinel) or a browser without the app: the words need the Windows app, but a QR
-        // code in the picture is read here, on this device, and its link checked, as the email scan does.
-        shotStatus.textContent = 'Looking for a QR code in the picture…';
-        let code = null;
-        try { code = await qrFromFile(file); } catch { /* no reader or no code: said below */ }
-        if (code != null && await explainQr(qrOut, code, { focus: true })) {
-          shotStatus.textContent = 'The QR code in this picture was read and checked below. The words in a picture are read by the Sentinel app for Windows.';
-        } else {
-          shotStatus.textContent = 'The words in a picture are read by the Sentinel app for Windows, so they cannot be read here. Copy the message itself, then paste it in Message.';
-        }
-        return;
-      }
-      reading = true;
-      preview.classList.add('is-reading');
-      shotStatus.textContent = 'Reading the screenshot…';
-      try {
-        const m = window.SentinelTextShot.read(joinSlices(await desktop.readScreenshot(await sliceImage(file))));
-        if (!m.text) { shotStatus.textContent = 'No message was found in that image.'; return; }
-        shotStatus.textContent = m.from ? `Read a message from ${m.from}.` : 'Read the message.';
-        form.from.value = m.from;
-        form.text.value = m.text;
-        setMode('paste');
-        toast('Check what was read, then press Check this text.', 'info', 5000);
-        form.text.focus();
-      } catch (err) {
-        shotStatus.textContent = desktopError(err);
-      } finally {
-        reading = false;
-        preview.classList.remove('is-reading');
-        URL.revokeObjectURL(url);
-      }
-    };
-    const shotInput = $('[data-shot-file]', el);
-    shotInput.addEventListener('change', () => { readShot(shotInput.files[0]); shotInput.value = ''; });
-    const shotDrop = $('[data-shot-drop]', el);
-    ['dragenter', 'dragover'].forEach((t) => shotDrop.addEventListener(t, (ev) => { ev.preventDefault(); shotDrop.classList.add('is-over'); }));
-    ['dragleave', 'drop'].forEach((t) => shotDrop.addEventListener(t, (ev) => { ev.preventDefault(); shotDrop.classList.remove('is-over'); }));
-    shotDrop.addEventListener('drop', (ev) => readShot(ev.dataTransfer.files[0]));
-    // Ctrl+V with an image on the clipboard, on either tab: pasted words still go into the message box.
-    const onPaste = (ev) => {
-      if (!el.isConnected) { document.removeEventListener('paste', onPaste); return; }
-      const item = [...(ev.clipboardData ? ev.clipboardData.items : [])].find((i) => i.kind === 'file' && /^image\/(png|jpeg)$/.test(i.type));
-      if (item) { ev.preventDefault(); setMode('shot'); readShot(item.getAsFile()); }
-    };
-    document.addEventListener('paste', onPaste);
-
-    form.addEventListener('submit', async (ev) => {
-      ev.preventDefault();
-      if (!form.text.value.trim()) { toast('Paste the message you want checked.', 'error'); form.text.focus(); return; }
-      // A long conversation is read up to TEXT_MAX letters: its start (how it began) and its most recent part (where
-      // it is now). It used to be cut at 8000 by the box itself, without a word, losing the newest messages.
-      const all = form.text.value;
-      const cut = all.length > TEXT_MAX;
-      const text = cut ? `${all.slice(0, 10000)}\n${all.slice(-(TEXT_MAX - 10001))}` : all;
-      const button = $('button[type=submit]', form);
-      if (button.dataset.busy) return;
-      const watch = watchScan(out, TEXT_STEPS, { note: 'Read in memory only: never kept, and not in your history.' });
-      try {
-        const data = await busy(button, 'Checking', () => api('/scan/text', { method: 'POST', body: { from: form.from.value, text }, onStage: watch.onStage }));
-        applyUsage(data.usage);
-        $('[data-left]', el).textContent = allowance();
-        out.innerHTML = textResult(data.text, form.from.value.trim())
-          + (cut ? `<p class="field__hint u-mt-sm">This conversation is very long, so Sentinel read its first part and its most recent ${(TEXT_MAX - 10000).toLocaleString('en')} letters.</p>` : '');
-        riseMask(out);
-        watch.done();
-        const from = form.from.value.trim();
-        wireWarn(out, () => window.SentinelWarnCard.fromText(data.text, from, $('[data-text-result]', out).dataset.textResult));
-        out.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
-      } catch (err) { watch.fail(); out.innerHTML = friendlyError(err); }
-    });
-
-    // Shared from the phone's Share menu (shareView): checked at once, as a link shared to Link scan is. After the
-    // drafts are put back (render), so an old draft never takes the place of what was shared.
-    const share = shared;
-    shared = null;
-    if (share) Promise.resolve().then(() => {
-      if (share.text) {
-        form.from.value = '';
-        form.text.value = share.text;
-        form.text.dispatchEvent(new Event('input', { bubbles: true }));
-        form.requestSubmit();
-      } else if (share.image) {
-        setMode('shot');
-        readShot(share.image);
-        preview.scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
-      }
-    });
-  }
+  /* ============================================================ a text's result */
 
   /** The verdict card for a text: what it is, why, what to do, and each link's own result. */
   function textResult(r, from) {
@@ -2022,11 +2006,11 @@
 
   async function historyView(el, params) {
     el.innerHTML = `${title('History', 'Everything Sentinel checked for you in the last 30 days. Click a link to scan it again.')}
-      <div class="usage-list" data-stats><div class="skeleton u-h-sm"></div></div>
-      <div class="panel u-mt" data-list><div class="skeleton u-h-lg"></div></div>`;
+      <div class="usage-list" data-stats>${skel('stats')}</div>
+      <div class="panel u-mt" data-list>${skel('history')}</div>`;
     let data;
     try { data = await api('/account/history'); }
-    catch (err) { $('[data-list]', el).innerHTML = `<div class="banner banner--error">${esc(err.message)}</div>`; return; }
+    catch (err) { $('[data-stats]', el).innerHTML = ''; failed($('[data-list]', el), err, () => historyView(el, params), { what: 'Your history' }); return; }
 
     const s = data.stats;
     const stat = (glyph, n, label, color, filter) => `<button type="button" class="usage-row" data-stat="${filter}" aria-pressed="false"><span class="usage-row__icon" style="color:${color}">${Masks.svg(glyph)}</span><span class="usage-row__l">${label}</span><b class="usage-row__n tabular">${n}</b></button>`;
@@ -2039,7 +2023,7 @@
     list.innerHTML = `<div class="panel__head"><div><h2 data-total>${s.total} scan${s.total === 1 ? '' : 's'}</h2><p>${s.flagged} flagged</p></div>
         <span class="tools__end"><button type="button" class="btn btn--sm btn--ghost" data-history-clear ${data.items.length ? '' : 'hidden'}>Clear history</button>
         <label class="tools__search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input type="search" placeholder="Search history" aria-label="Search history" data-q></label></span></div>
-      <div class="tools" data-filters>${FILTERS.map(([id, label]) => `<button type="button" class="fchip" data-filter="${id}" aria-pressed="${id === hs.filter}">${label}</button>`).join('')}<span class="mono muted" data-count></span></div>
+      <div class="tools" data-filters data-full>${FILTERS.map(([id, label]) => `<button type="button" class="fchip" data-filter="${id}" aria-pressed="${id === hs.filter}">${label}</button>`).join('')}<span class="mono muted" data-count></span></div>
       <div data-rows></div>`;
 
     const paint = () => {
@@ -2052,7 +2036,9 @@
       });
       $('[data-count]', list).textContent = `${items.length} of ${data.items.length}`;
       $('[data-rows]', list).innerHTML = items.length ? historyList(items, { clickable: true })
-        : `<div class="empty">${Masks.svg('scam')}<p>${data.items.length ? 'Nothing matches that filter.' : 'No scans yet. Paste a link on the Overview page to run your first one.'}</p></div>`;
+        : data.items.length
+          ? stateBlock('nomatch', hs.q ? `Nothing in your history matches &ldquo;${esc(hs.q)}&rdquo;${hs.filter === 'all' ? '' : ' with that filter'}.` : 'Nothing in your history matches that filter.', { action: '<button type="button" class="btn btn--sm" data-show-all>Show every scan</button>' })
+          : stateBlock('waiting', 'No scans yet. What you check shows here for 30 days, so you can look again.', { action: '<a class="btn btn--sm btn--gold" href="/app/check">Check something</a>' });
       $$('[data-filter]', list).forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.filter === hs.filter)));
       $$('[data-stat]', el).forEach((b) => {
         b.classList.toggle('is-active', b.dataset.stat === hs.filter);
@@ -2073,6 +2059,13 @@
       $('[data-history-clear]', list).hidden = !data.items.length;
     };
     list.addEventListener('click', (ev) => {
+      if (ev.target.closest('[data-show-all]')) {
+        hs.filter = 'all'; hs.q = '';
+        $('[data-q]', list).value = '';
+        paint();
+        $('[data-q]', list).focus();
+        return;
+      }
       const del = ev.target.closest('[data-forget]');
       if (del) {
         busy(del, '', async () => {
@@ -2096,7 +2089,7 @@
       // The address is a link of its own (the app's link handler opens it); the rest of the row does the same.
       if (ev.target.closest('a')) return;
       const row = ev.target.closest('[data-rescan]');
-      if (row) navigate(`/app/scan?url=${encodeURIComponent(row.dataset.rescan)}`);
+      if (row) navigate(`/app/check?url=${encodeURIComponent(row.dataset.rescan)}`);
     });
     // Clearing everything asks first: one press says what a second press does.
     let clearArmed = 0;
@@ -2120,6 +2113,8 @@
       }).then(() => { clear.textContent = 'Clear history'; });
     });
     paint();
+    keep($('[data-stats]', el), 'stats');
+    keep(list, 'history');
   }
 
   /* ========================================================== site rules */
@@ -2134,8 +2129,8 @@
         <div class="report__foot"><span class="muted">Rules apply to the whole site, including its subdomains. Only your account is affected.</span><button class="btn btn--gold" type="submit">Add rule</button></div>
       </form>
       <div class="grid2 u-mt">
-        <div class="panel" data-allow><div class="skeleton u-h-md" ></div></div>
-        <div class="panel" data-block><div class="skeleton u-h-md" ></div></div>
+        <div class="panel" data-allow>${skel('allow')}</div>
+        <div class="panel" data-block>${skel('block')}</div>
       </div>`;
 
     let rule = 'allow';
@@ -2147,7 +2142,13 @@
     const load = async () => {
       let overrides = [];
       try { ({ overrides } = await api('/sites/overrides')); }
-      catch (err) { $('[data-allow]', el).innerHTML = `<div class="banner banner--error">${esc(err.message)}</div>`; return; }
+      catch (err) {
+        // One answer for both lists, in the first: they come from the same place.
+        $('[data-block]', el).hidden = true;
+        failed($('[data-allow]', el), err, () => { $('[data-allow]', el).innerHTML = skel('allow'); load(); }, { what: 'Your site rules' });
+        return;
+      }
+      $('[data-block]', el).hidden = false;
       const section = (slot, action, heading, empty) => {
         const rows = overrides.filter((o) => o.action === action);
         slot.innerHTML = `<div class="panel__head"><div><h2>${heading}</h2><p>${rows.length} site${rows.length === 1 ? '' : 's'}</p></div></div>
@@ -2155,10 +2156,12 @@
             <span class="list__icon">${action === 'allow' ? ICON.check : ICON.lock}</span>
             <span class="list__main"><b class="mono">${esc(o.host)}</b><span>Added ${ago(o.created_at)}</span></span>
             <button class="btn btn--sm" data-remove="${esc(o.host)}">Remove</button>
-          </li>`).join('')}</ul>` : `<div class="empty"><p>${empty}</p></div>`}`;
+          </li>`).join('')}</ul>` : stateBlock('waiting', empty, { small: true })}`;
       };
       section($('[data-allow]', el), 'allow', 'Trusted', 'No trusted sites yet. Use "Trust this site" on any scan result, or add one above.');
       section($('[data-block]', el), 'block', 'Blocked', 'No blocked sites. Block a site to give it a red mask everywhere, for you.');
+      keep($('[data-allow]', el), 'allow');
+      keep($('[data-block]', el), 'block');
       $$('[data-remove]', el).forEach((b) => b.addEventListener('click', () => busy(b, 'Removing', async () => {
         try {
           await api('/sites/override', { method: 'POST', body: { host: b.dataset.remove, action: 'clear' } });
@@ -2283,12 +2286,12 @@
           ${addons.length ? `${bad.length ? `<ul class="list">${bad.map(addonRow).join('')}</ul>` : ''}
             ${clean.length ? `<details class="group" data-clean-addons><summary><span>${clean.length}${bad.length ? ' more' : ''} add-on${clean.length === 1 ? '' : 's'}, nothing to look at</span><i></i></summary>
               <ul class="list">${clean.map(addonRow).join('')}</ul></details>` : ''}`
-            : '<div class="empty"><p>No add-ons.</p></div>'}
+            : stateBlock('clear', 'No add-ons.', { small: true })}
           <h4 class="u-mt">Sites allowed to send notifications</h4>
-          ${p.notifications === null ? '<div class="empty"><p>These could not be read.</p></div>'
+          ${p.notifications === null ? stateBlock('unavailable', 'These could not be read.', { small: true })
             : sites.length ? `<ul class="list">${sites.map((s) => siteRow(s.origin.replace(/^https?:\/\//, ''), s, 'Can send you notifications')).join('')}</ul>
               <p class="muted u-mt-xs">Fake virus alerts and prize pop-ups arrive this way. To stop a site, remove it at ${copy(b.places.notifications)}</p>`
-              : '<div class="empty"><p>No site may send notifications.</p></div>'}
+              : stateBlock('clear', 'No site may send notifications.', { small: true })}
           ${p.search ? `<h4 class="u-mt">Search engine</h4><ul class="list">${row(searchBadge ? Masks.svg('scam') : ICON.search, searchBadge, p.search.name || p.search.host || 'Custom',
             p.search.host && !p.search.known ? `${p.search.host} is not a search engine people know. Unwanted software changes your search to earn from what you look for.${p.search.verdict && p.search.verdict.badge ? ` ${p.search.verdict.label}.` : ''}` : `${p.search.engine || p.search.name || p.search.host || 'A search engine'} runs your searches.`,
             searchBadge ? `To choose your own, ${settings ? `open ${copy(settings)} and search its settings for "search engine"` : `go to ${copy(b.places.search)}`}` : '')}</ul>` : ''}
@@ -2311,7 +2314,7 @@
         <p class="muted">Checked ${esc(ago(r.at))}. Sentinel changed nothing. Removing anything is your choice, in the browser, and you can add it back.${r.sitesChecked ? '' : ` Site addresses were not checked, so only add-ons, search engines and policies were judged. ${esc(r.sitesWhy || 'Sentinel could not reach its scanner just now.')}`}</p>
         ${notChecked}
       </div>${panels}`
-      : `<div class="panel u-mt"><div class="empty"><p>No ${esc(list(r.looked || []))} settings were found on this computer.</p>${notChecked}</div></div>`;
+      : `<div class="panel u-mt">${stateBlock('unavailable', `No ${esc(list(r.looked || []))} settings were found on this computer.`, { action: notChecked })}</div>`;
 
     $$('[data-copy-text]', out).forEach((btn) => btn.addEventListener('click', async () => {
       try { await navigator.clipboard.writeText(btn.dataset.copyText); toast('Copied. Paste it into the browser\'s address bar.', 'success'); }
@@ -2336,6 +2339,8 @@
 
     const needsApp = !desktop;
     const lock = planLocked ? 'Pro & up' : needsApp ? 'Needs app' : null;
+    // "On" only for what is running now: page warnings and search marks are live scanning's.
+    const liveOn = Boolean(state.desktopInfo && state.desktopInfo.live && state.desktopInfo.live.enabled);
 
     el.innerHTML = `
       ${title('Live protection', 'Sentinel watching in real time: on search results, in your inbox and on every download.')}
@@ -2345,8 +2350,8 @@
         : ''}
 
       <div class="feature-grid">
-        ${feature(Masks.svg('scam'), 'Page warnings', 'While a browser is in front, Sentinel checks the address of the page it shows and warns you before a dangerous one gets your details. No add-on.', st(!lock && desktop, lock || 'Needs app'))}
-        ${feature(ICON.search, 'Search result masks', `A gold line crosses the page when you search, then a mask appears beside every result. Google, Bing, DuckDuckGo, Brave, Yahoo, Ecosia and more.${f.liveResearch ? ' Every result is researched.' : ''}`, st(!lock && desktop, lock || 'Needs app'))}
+        ${feature(Masks.svg('scam'), 'Page warnings', 'While a browser is in front, Sentinel checks the address of the page it shows and warns you before a dangerous one gets your details. No add-on.', st(!lock && liveOn, lock || 'Off'))}
+        ${feature(ICON.search, 'Search result masks', `A line of light crosses the page when you search, then a mask appears beside every result. Google, Bing, DuckDuckGo, Brave, Yahoo, Ecosia and more.${f.liveResearch ? ' Every result is researched.' : ''}`, st(!lock && liveOn, lock || 'Off'))}
         ${feature(ICON.mail, 'Email masks', 'Gmail and Outlook on the web: the messages in your inbox list get a green mask or a warning mask before you open them. Sentinel reads only what the list shows (sender, subject, first line) and never opens a message.', f.emailLive && !planLocked ? '<span class="status">Optional add-on</span>' : st(false, 'Pro & up'))}
         ${feature(ICON.download, 'Download protection', 'Every new file in your Downloads folder is inspected on your computer.', st(!lock && desktop && state.desktopInfo && state.desktopInfo.downloads.active, lock || 'Off'))}
       </div>
@@ -2360,14 +2365,13 @@
       </div>` : ''}
 
       <div data-desktop>${desktop && !planLocked ? '<div class="skeleton desktop-skeleton" aria-hidden="true"></div>' : ''}</div>
-      <div id="parent-lock" data-parent-lock></div>
       <div class="panel u-mt" data-intel>
         <div class="panel__head"><div><h2>Threat intelligence</h2><p>The public feeds every scan is checked against, refreshed automatically.</p></div></div>
         <div class="skeleton u-h-sm"></div>
-      </div>`;
+      </div>
+      <p class="set-away u-mt"><a href="/app/settings#protection">Change what Sentinel watches in Settings</a></p>`;
 
     if (desktop && !planLocked) renderDesktopControls($('[data-desktop]', el));
-    if (desktop) renderParentLock($('[data-parent-lock]', el));
     renderIntel($('[data-intel]', el));
   }
 
@@ -2394,28 +2398,14 @@
           <span class="list__main"><b>${esc(names[f.source] || f.source)}</b><span>${f.entries.toLocaleString()} entries &middot; ${f.fetchedAt ? `updated ${ago(f.fetchedAt)}` : 'not fetched yet'}</span></span>
         </li>`).join('')}</ul>
       </div>`;
-    } catch { $('.skeleton', slot).outerHTML = '<p class="muted">Feed status is unavailable right now.</p>'; }
+    } catch (err) {
+      const wait = $('.skeleton', slot);
+      const box = document.createElement('div');
+      wait.replaceWith(box);
+      failed(box, err, () => { box.outerHTML = '<div class="skeleton u-h-sm"></div>'; renderIntel(slot); }, { small: true, what: 'The status of the threat lists' });
+    }
   }
 
-  /**
-   * Chat safety (Roblox and the Discord app): what it reads and what it never does, said before it is switched on.
-   * Off until the person (or a parent) turns it on.
-   */
-  function chatSafetyPanel(info) {
-    const cs = (info && info.chatSafety) || { enabled: false, supported: false };
-    if (!desktop || !desktop.setChatSafety) return '';
-    return `<div class="panel u-mt" id="chat-safety">
-      <div class="panel__head"><div><h2>Chat safety: Roblox and Discord</h2>
-        <p>Points out scams and people who may not be safe to talk to (someone asking a child to keep secrets, to send pictures, to move to another app, or to meet), right beside the message, while Roblox or the Discord app is in front.</p></div>
-        <input class="switch" type="checkbox" data-chat-safety aria-label="Chat safety" ${cs.enabled ? 'checked' : ''} ${cs.supported ? '' : 'disabled'}></div>
-      <p class="muted u-mt-sm${cs.enabled && readerDown(cs, '') ? ' is-down' : ''}" role="status" data-chat-seen>${chatSeenText(cs)}</p>
-      <ul class="list">
-        <li><span class="list__icon">${ICON.shield}</span><span class="list__main"><b>Read on this computer only</b><span>Messages are read from the screen as they appear, judged here and forgotten. No message, name or game is sent to Sentinel or anyone else, saved, or logged.</span></span></li>
-        <li><span class="list__icon">${Masks.svg('logo')}</span><span class="list__main"><b>Always plain to see</b><span>A Sentinel badge shows while chat is watched. In a Roblox game it shows only when you open the Esc menu, so it never covers the game; warnings sit small, beside the chat box.</span></span></li>
-        <li><span class="list__icon">${ICON.check}</span><span class="list__main"><b>Never in the way</b><span>Nothing is read while a game's chat is closed. Sentinel never changes Roblox or Discord, never types or clicks in them, and only speaks up when a message is suspicious, using the game or server it is in to tell play from danger.</span></span></li>
-      </ul>
-    </div>`;
-  }
   /**
    * Parent lock: a PIN before protection can be switched off or Sentinel quit. The PIN is checked by the app on this
    * computer (desktop/src/parentlock.js); only a salted hash of it is kept. Drawn into its own slot, since it changes
@@ -2424,8 +2414,9 @@
   async function renderParentLock(slot) {
     if (!slot || !desktop || !desktop.lockStatus) return;
     let s;
-    try { s = await desktop.lockStatus(); } catch { return; }
-    if (!slot.isConnected || !s.supported) { slot.innerHTML = ''; return; }
+    try { s = await desktop.lockStatus(); } catch { slot.innerHTML = '<p class="set-why">The Sentinel app did not answer. Open this page again.</p>'; return; }
+    if (!slot.isConnected) return;
+    if (!s.supported) { slot.innerHTML = '<p class="set-why">Needs Windows.</p>'; return; }
     clearTimeout(slot._relock);
     const pinInput = (name, label, auto) => `<div class="field"><label for="pl-${name}">${label}</label><input class="input code-input" id="pl-${name}" name="${name}" type="password" inputmode="numeric" pattern="[0-9]{4,8}" minlength="4" maxlength="8" autocomplete="${auto}" required></div>`;
     // Sentinel is installed for one Windows account, and that account can uninstall it, administrator or not.
@@ -2435,7 +2426,7 @@
     const record = s.record || [];
     const recordList = `<h3 class="u-mt">Record</h3>
         <p class="field__hint">Times and switches only. Nothing about a chat or a page is ever written here.</p>
-        ${record.length ? `<ul class="list">${record.slice(0, 10).map((r) => `<li><span class="list__icon">${ICON.shield}</span><span class="list__main"><b>${esc(r.text)}${r.times > 1 ? ` (${r.times} times)` : ''}</b><span>${esc(when(r.at))}</span></span></li>`).join('')}</ul>` : '<div class="empty"><p>Nothing yet.</p></div>'}`;
+        ${record.length ? `<ul class="list">${record.slice(0, 10).map((r) => `<li><span class="list__icon">${ICON.shield}</span><span class="list__main"><b>${esc(r.text)}${r.times > 1 ? ` (${r.times} times)` : ''}</b><span>${esc(when(r.at))}</span></span></li>`).join('')}</ul>` : stateBlock('waiting', 'Nothing yet.', { small: true })}`;
     const minutes = (n) => (n >= 60 ? `${Math.ceil(n / 60)} minute${Math.ceil(n / 60) === 1 ? '' : 's'}` : `${n} second${n === 1 ? '' : 's'}`);
     let body;
     if (!s.set) {
@@ -2466,12 +2457,7 @@
         ${recordList}`;
       slot._relock = setTimeout(() => { if (slot.isConnected) renderParentLock(slot); }, Math.max(1000, s.unlockedUntil - Date.now() + 1000));
     }
-    slot.innerHTML = `<div class="panel u-mt">
-      <div class="panel__head"><div><h2>Parent lock</h2>
-        <p>With a PIN set, switching off any of Sentinel's protection on this page or in the tray, or quitting Sentinel, needs the PIN. So do putting a quarantined file back, telling the tech-support scam shield that you use a remote-control program yourself, and switching accounts. Turning protection on never does. On a computer a child uses, a stranger cannot talk them into switching Sentinel off.</p>
-        <p>It does not cover the browser companion or Windows administrator accounts.</p></div></div>
-      ${body}
-    </div>`;
+    slot.innerHTML = body;
 
     const act = (el, fn, done) => el && el.addEventListener(el.tagName === 'FORM' ? 'submit' : 'click', async (ev) => {
       ev.preventDefault();
@@ -2489,8 +2475,8 @@
     act($('[data-pl-relock]', slot), () => desktop.lockRelock(), 'Locked.');
     act($('[data-pl-remove]', slot), () => desktop.lockRemove(), 'Parent lock is off.');
     act($('[data-pl-reset]', slot), () => desktop.lockReset(), 'The PIN was removed. Set a new one to lock again.');
-    // Opened from a refused tray click: straight to the PIN.
-    if (location.hash === '#parent-lock' && !slot._scrolled) { slot._scrolled = true; slot.scrollIntoView({ block: 'start' }); const pin = $('input', slot); if (pin) pin.focus({ preventScroll: true }); }
+    // Opened from a refused tray click: straight to the PIN (Settings scrolls the row into view).
+    if (location.hash === '#parent-lock' && !slot._scrolled) { slot._scrolled = true; const pin = $('input', slot); if (pin) pin.focus({ preventScroll: true }); }
   }
   // The switch says on either way: when the reader is not running, that is the first thing said.
   function readerDown(status, what) {
@@ -2511,23 +2497,6 @@
     if (!d && !r) return now;
     return `${now} Since Sentinel started: ${d} message${d === 1 ? '' : 's'} checked in Discord, ${r} in Roblox, ${f} flagged.`;
   }
-  /** Check my texts (Phone Link): what it reads and what it never does, said before it is switched on. Off until turned on. */
-  function textSafetyPanel(info) {
-    const ts = (info && info.textSafety) || { enabled: false, supported: false };
-    if (!desktop || !desktop.setTextSafety) return '';
-    return `<div class="panel u-mt" id="text-safety">
-      <div class="panel__head"><div><h2>Check my texts</h2>
-        <p>If your phone's texts show on this computer through Phone Link, Sentinel points out English scam texts (unpaid tolls, parcel fees, "Hi Mum, this is my new number", task jobs, "your account is locked") right beside the message, while Phone Link is in front.</p></div>
-        <input class="switch" type="checkbox" data-text-safety aria-label="Check my texts" ${ts.enabled ? 'checked' : ''} ${ts.supported ? '' : 'disabled'}></div>
-      <p class="muted u-mt-sm${ts.enabled && readerDown(ts, '') ? ' is-down' : ''}" role="status" data-text-seen>${textSeenText(ts)}</p>
-      <ul class="list">
-        <li><span class="list__icon">${ICON.shield}</span><span class="list__main"><b>Read on this computer only</b><span>The conversation on screen is read as it appears, judged here and forgotten. No text, name or number is sent to Sentinel or anyone else, saved, or logged.</span></span></li>
-        <li><span class="list__icon">${ICON.globe}</span><span class="list__main"><b>Links checked, never opened</b><span>A link in a text is checked by its address, the way a copied link is. Sentinel never opens it, and it is not added to your history.</span></span></li>
-        <li><span class="list__icon">${ICON.check}</span><span class="list__main"><b>Never in the way</b><span>Only texts you received are checked. Sentinel never changes Phone Link, never types, clicks or replies in it, and only speaks up when a text looks like a scam.</span></span></li>
-        <li><span class="list__icon">${ICON.globe}</span><span class="list__main"><b>English texts for now</b><span>Sentinel knows the wording of scam texts in English only. It tells the texts you received from the ones you sent by which side they are on, so Phone Link needs to show a left-to-right language, such as English.</span></span></li>
-      </ul>
-    </div>`;
-  }
   // What Check my texts is doing right now, in numbers only.
   function textSeenText(ts) {
     if (!ts.enabled) return 'Off. Turn it on, then open a conversation in Phone Link.';
@@ -2541,27 +2510,12 @@
     if (!n) return now + missed;
     return `${now} Since Sentinel started: ${n} text${n === 1 ? '' : 's'} checked, ${f} flagged.${missed}`;
   }
-  function bindTextSafety(slot) {
-    const sw = $('[data-text-safety]', slot);
-    if (!sw || sw.disabled) return;
-    const line = $('[data-text-seen]', slot);
-    if (line && desktop.onTextSafety) {
-      const off = desktop.onTextSafety((ts) => { if (ts) { line.textContent = textSeenText(ts); line.classList.toggle('is-down', Boolean(ts.enabled && readerDown(ts, ''))); sw.checked = Boolean(ts.enabled); } });
-      if (slot._off && typeof off === 'function') slot._off.push(off);
-    }
-    sw.addEventListener('change', async () => {
-      try {
-        const s = await desktop.setTextSafety(sw.checked);
-        toast(s.enabled ? 'Check my texts is on. Open a conversation in Phone Link and Sentinel checks it.' : 'Check my texts is off.', 'success');
-      } catch (err) { sw.checked = !sw.checked; toast(desktopError(err), 'error'); }
-    });
-  }
   const CHAT_ON = 'Chat safety is on. Open Roblox or Discord and Sentinel watches their chat.';
   const EXPOSURE_ON = 'Exposure alerts are on. Sentinel will tell you if a site you visit is listed later.';
 
   /*
    * "New in Sentinel" cards: asked once, in the Windows app, before a feature ever reads anything. What it does, then
-   * Turn on or Not now. The answer (or switching the feature in Live protection) is kept in local storage as
+   * Turn on or Not now. The answer (or switching the feature in Settings) is kept in local storage as
    * sentinel:asked:<name>, never sent anywhere. Before 1.12.1 the keys were sentinel.chatAsked and
    * sentinel.exposureAsked; they are moved over once.
    */
@@ -2588,34 +2542,20 @@
     });
   }
 
-  async function askChatSafety(slot) {
+  async function askChatSafety(slot, again) {
     if (!slot || !desktop || !desktop.setChatSafety || asked('chat')) return;
     let info = state.desktopInfo;
-    try { if (!info) info = state.desktopInfo = await desktop.info(); } catch { return; }
+    try { if (!info) info = state.desktopInfo = await desktop.info(); } catch (err) {
+      failed(slot, { message: desktopError(err) }, again || (() => askChatSafety(slot)), { small: true, quiet: true, what: 'The Sentinel app did not answer, so its suggestions are not shown.' });
+      return;
+    }
     if (!info.chatSafety || !info.chatSafety.supported || info.chatSafety.enabled || !slot.isConnected) return;
     askOnce(slot, {
-      name: 'chat', title: 'Chat safety for Roblox and Discord', yes: 'Turn on chat safety', howHref: '/app/protection#chat-safety',
+      name: 'chat', title: 'Chat safety for Roblox and Discord', yes: 'Turn on chat safety', howHref: '/app/settings#chat-safety',
       body: 'Sentinel can point out scams and people who may not be safe to talk to, right beside the message, while Roblox or the Discord app is in front. It reads chat on this computer only and keeps nothing; a badge shows while it watches, and in a Roblox game only when you press Esc. Turn it on for yourself, or for a child who uses this computer.',
       onYes: async () => { await desktop.setChatSafety(true); toast(CHAT_ON, 'success'); }
     });
   }
-  function bindChatSafety(slot) {
-    const sw = $('[data-chat-safety]', slot);
-    if (!sw || sw.disabled) return;
-    const line = $('[data-chat-seen]', slot);
-    if (line && desktop.onChatSafety) {
-      const off = desktop.onChatSafety((cs) => { if (cs) { line.textContent = chatSeenText(cs); line.classList.toggle('is-down', Boolean(cs.enabled && readerDown(cs, ''))); sw.checked = Boolean(cs.enabled); } });
-      if (slot._off && typeof off === 'function') slot._off.push(off);
-    }
-    sw.addEventListener('change', async () => {
-      try {
-        const s = await desktop.setChatSafety(sw.checked);
-        markAsked('chat');
-        toast(s.enabled ? CHAT_ON : 'Chat safety is off.', 'success');
-      } catch (err) { sw.checked = !sw.checked; toast(desktopError(err), 'error'); }
-    });
-  }
-
   /* Exposure alerts: sites visited in the last 14 days that a threat list named afterwards (server/lib/scan/exposure.js). */
   const EXPOSURE_WHAT = { phishing: 'Fake sign-in page', crypto: 'Crypto scam', scam: 'Scam site', malware: 'Spreads malware' };
   // The password and scan steps are the shared ones (steps.js), the same words as the recovery guide's.
@@ -2650,35 +2590,17 @@
     const supported = Boolean(info && info.live && info.live.supported);
     // Sites are remembered only while live scanning runs: with it off, "nothing so far" would be no news at all.
     const empty = !supported ? 'Available on Windows, with live scanning.'
-      : !on ? 'Off. Nothing about the sites you visit is remembered.'
+      : !on ? 'Off. Nothing about the sites you visit is remembered. <a href="/app/settings#exposure-alerts">Turn on exposure alerts in Settings</a>.'
         : !(info.live && info.live.enabled) ? 'On, but live scanning is off, so no sites are being remembered. Start scanning to use exposure alerts.'
           : 'Nothing so far. None of the sites you visited in the last 14 days has been put on a threat list since.';
-    // The marks live with whichever Sentinel server the app uses: its own, on this computer, or one set up for it.
-    let where = 'on this computer';
-    if (info && !info.embeddedServer) { try { where = `on the Sentinel server this app uses (${new URL(info.origin).host})`; } catch { where = 'on the Sentinel server this app uses'; } }
     return `<div class="panel u-mt" id="exposures">
       <div class="panel__head"><div><h2>Exposure alerts</h2>
-        <p>A scam page often reaches the threat lists hours or days after it goes up. With this on, Sentinel remembers the sites live scanning found safe for 14 days, and tells you if a list names one of them afterwards, with what to do.</p></div>
-        <input class="switch" type="checkbox" data-exposure-alerts aria-label="Exposure alerts" ${on ? 'checked' : ''} ${supported ? '' : 'disabled'}></div>
+        <p>Sites you visited that a threat list named afterwards, with what to do.</p></div></div>
       ${items.length ? `<ul class="list">${items.map(exposureItem).join('')}</ul>`
         : `<p class="muted u-mt-sm">${empty}</p>`}
-      <ul class="live__facts">
-        <li>Kept ${esc(where)} as a scrambled code of each site&rsquo;s name and the day, never the address or the time, and erased after 14 days. Turning this off erases every one, and every alert found so far. The copies Sentinel keeps to repair its accounts file can hold them for up to 7 more days.</li>
-        <li>Private windows are never remembered. Pages on shared sites (a Google Sites page, a Netlify site) are left out, since one bad page there says nothing about the one you saw.</li>
-      </ul>
     </div>`;
   }
   function bindExposures(slot) {
-    const sw = $('[data-exposure-alerts]', slot);
-    if (sw && !sw.disabled) sw.addEventListener('change', async () => {
-      try {
-        const r = await desktop.setExposureAlerts(sw.checked);
-        markAsked('exposure');
-        if (!sw.checked && r && r.erased === false) toast('Exposure alerts are off. The remembered sites could not be erased just now, so Sentinel will try again each time it starts.', 'success');
-        else toast(sw.checked ? EXPOSURE_ON : 'Exposure alerts are off. Every remembered site is erased.', 'success');
-      } catch (err) { sw.checked = !sw.checked; toast(desktopError(err), 'error'); }
-      renderDesktopControls(slot);
-    });
     $$('[data-exposure-done]', slot).forEach((b) => b.addEventListener('click', async () => {
       b.disabled = true;
       try { await desktop.dismissExposure(b.dataset.exposureDone); renderDesktopControls(slot); }
@@ -2696,68 +2618,6 @@
     })));
     if (desktop.onExposures) slot._off.push(desktop.onExposures(() => { if (slot.isConnected) renderDesktopControls(slot); }));
   }
-  /* Your sites: look-alikes of the sites this person uses, not only of the big brands (server/lib/scan/mysites.js). */
-  function mySitesPanel(info, sites) {
-    if (!desktop || !desktop.setMySites) return '';
-    const on = Boolean(info && info.mySites !== false);
-    // Kept only by the app's own server on this computer: with another server there is nothing to keep them in.
-    const local = Boolean(info && info.embeddedServer);
-    const row = (s) => `<li>
-      <span class="list__icon">${ICON.globe}</span>
-      <span class="list__main"><b class="mono">${esc(s.host)}</b><span>${s.source === 'you' ? 'Added by you' : 'Learned: you use it often'}</span></span>
-      <button class="btn btn--sm" data-my-site-remove="${esc(s.host)}">Remove</button>
-    </li>`;
-    const body = !local ? '<p class="muted u-mt-sm">Available when the app uses its own scanner on this computer.</p>'
-      : !on ? '<p class="muted u-mt-sm">Off. No sites are learned or kept.</p>'
-        : `<form class="my-sites__add" data-my-sites-add>
-            <input class="input mono" name="host" placeholder="mycu.org" aria-label="A site you use" autocomplete="off" spellcheck="false" maxlength="300" required>
-            <button class="btn btn--gold" type="submit">Add site</button>
-          </form>
-          ${sites.length ? `<ul class="list u-mt-sm">${sites.map(row).join('')}</ul>
-            <div class="report__foot"><span class="muted">${sites.length} site${sites.length === 1 ? '' : 's'}</span><button class="btn btn--sm" data-my-sites-forget>Forget all</button></div>`
-            : '<p class="muted u-mt-sm">None yet. A site you visit on three different days is added by itself, or add one now.</p>'}`;
-    return `<div class="panel u-mt" id="my-sites">
-      <div class="panel__head"><div><h2>Your sites</h2>
-        <p>Sentinel knows the big brands. Here it learns yours: your bank or credit union, your school portal, your work sign-in. A link or page made to look like one of them gets a warning, in live scanning, copied links, email and link scans.</p></div>
-        <input class="switch" type="checkbox" data-my-sites aria-label="Your sites" ${on ? 'checked' : ''} ${local ? '' : 'disabled'}></div>
-      ${body}
-      <ul class="live__facts">
-        <li>Kept on this computer only, as plain site names you can read here. A site you passed through is never written down: until a site has been seen on three days, only a scrambled code of it is kept.</li>
-        <li>Learned only from pages live scanning found safe, never from a private window. Turning this off forgets every site.</li>
-      </ul>
-    </div>`;
-  }
-  function bindMySites(slot) {
-    const sw = $('[data-my-sites]', slot);
-    if (sw && !sw.disabled) sw.addEventListener('change', async () => {
-      try {
-        const r = await desktop.setMySites(sw.checked);
-        toast(sw.checked ? 'Your sites: on. Sentinel will learn the sites you use.' : r && r.erased === false ? 'Your sites: off. The sites could not be erased just now, so Sentinel will try again each time it starts.' : 'Your sites: off. Every site is forgotten.', 'success');
-      } catch (err) { sw.checked = !sw.checked; toast(desktopError(err), 'error'); }
-      renderDesktopControls(slot);
-    });
-    const form = $('[data-my-sites-add]', slot);
-    if (form) form.addEventListener('submit', async (ev) => {
-      ev.preventDefault();
-      const input = form.elements.host;
-      try {
-        await desktop.addMySite(input.value);
-        toast('Added. Look-alikes of it now get a warning.', 'success');
-        renderDesktopControls(slot);
-      } catch (err) { input.setAttribute('aria-invalid', 'true'); toast(desktopError(err), 'error'); }
-    });
-    $$('[data-my-site-remove]', slot).forEach((b) => b.addEventListener('click', async () => {
-      b.disabled = true;
-      try { await desktop.removeMySite(b.dataset.mySiteRemove); renderDesktopControls(slot); }
-      catch (err) { b.disabled = false; toast(desktopError(err), 'error'); }
-    }));
-    const forget = $('[data-my-sites-forget]', slot);
-    if (forget) forget.addEventListener('click', async () => {
-      try { await desktop.forgetMySites(); toast('Every site is forgotten.', 'success'); renderDesktopControls(slot); }
-      catch (err) { toast(desktopError(err), 'error'); }
-    });
-  }
-
   // Asked once, in the Windows app, once live scanning is in use: what exposure alerts do, then Turn on or Not now.
   async function askExposureAlerts(slot) {
     if (!slot || !desktop || !desktop.setExposureAlerts || asked('exposure')) return;
@@ -2766,10 +2626,66 @@
     // The card promises "on this computer only", which holds only with the app's own server.
     if (info.exposureAlerts || !info.embeddedServer || !info.live || !info.live.supported || !info.live.enabled || !slot.isConnected) return;
     askOnce(slot, {
-      name: 'exposure', title: 'Hear about it if a site you visited turns out to be a scam', yes: 'Turn on exposure alerts', howHref: '/app/protection#exposures',
+      name: 'exposure', title: 'Hear about it if a site you visited turns out to be a scam', yes: 'Turn on exposure alerts', howHref: '/app/settings#exposure-alerts',
       body: 'Scam pages often reach the threat lists a day or two after they go up. Sentinel can remember the sites live scanning found safe for 14 days, on this computer only and as scrambled codes, and tell you if a list names one of them later, with what to change.',
       onYes: async () => { await desktop.setExposureAlerts(true); toast(EXPOSURE_ON, 'success'); }
     });
+  }
+
+  /*
+   * The first-run step: once on this device, the first time home opens, a few of Settings' own rows in one calm panel,
+   * so the main choices are made in the first minute. It is a view of Settings, not a copy: each row is drawn and saved
+   * by its SETTINGS entry, so a choice made here works at once and is the same choice there. Each slot below takes the
+   * first of its ids that has a row; a row that cannot work here (its why) is left out. Hooks for rows built elsewhere:
+   *   'accent'      the accent colours (work/e2e-c-design); 'theme' (light or dark) stands in until it lands
+   *   'motion'      Full, Calm or Off (work/e2e-c-motion)
+   *   'warn-level'  how loud Sentinel is (work/e2e-c-quiet)
+   * Done, or Escape, keeps what is chosen, and the step never comes back. Storage that cannot be used: never shown.
+   */
+  const FIRST_CHOICES = [['accent', 'theme'], ['motion'], ['warn-level'], ['text-size']];
+  const FIRST_KEY = 'sentinel:first-choices';
+  function firstChoices(slot) {
+    try { if (localStorage.getItem(FIRST_KEY)) return false; } catch { return false; }
+    const rows = FIRST_CHOICES.map((ids) => ids.map((id) => SETTINGS.find((r) => r.id === id)).find(Boolean)).filter(Boolean);
+    if (!rows.length) return false;
+    slot.innerHTML = `<section class="first" aria-labelledby="first-h"><div class="first__fold"><div class="first__in">
+      <h2 id="first-h">Make Sentinel yours</h2>
+      <p class="first__lead">Each choice works the moment you make it, and every one of them is in Settings too.</p>
+      <div class="first__rows">${rows.map(rowHTML).join('')}</div>
+      <div class="first__end">${desktop ? '<p>Closing this window leaves Sentinel running in the tray. Right-click the mask there to quit.</p>' : ''}
+        <a class="btn btn--ghost" href="/app/settings#look">All settings</a><button class="btn btn--gold" type="button" data-first-done>Done</button></div>
+    </div></div></section>`;
+    const box = $('.first', slot);
+    const ctx = { info: state.desktopInfo, ready: !desktop || Boolean(state.desktopInfo), data: { mine: [] }, offs: [], draw, refresh };
+    function draw() {
+      if (!box.isConnected) return;
+      for (const r of rows) {
+        const row = $(`[data-set-row="${r.id}"]`, box);
+        if (r.app && !ctx.ready) continue;
+        row.hidden = Boolean(r.why && r.why(ctx.info));
+        if (!row.hidden) paintRow(r, row, ctx);
+      }
+    }
+    async function refresh() {
+      if (desktop) { try { ctx.info = state.desktopInfo = await desktop.info(); } catch { /* an app row says the app did not answer */ } ctx.ready = true; }
+      draw();
+    }
+    if (rows.some((r) => r.app) && !ctx.ready) refresh(); else draw();
+
+    // Done folds the panel away (a height spring, as a Settings row leaves a search); with motion off it simply goes.
+    const done = () => {
+      try { localStorage.setItem(FIRST_KEY, '1'); } catch { /* asked again next time: nothing lost */ }
+      const back = box.contains(document.activeElement);
+      const gone = () => { slot.innerHTML = ''; if (back) { const q = $('[data-quick] input'); if (q) q.focus({ preventScroll: true }); } };
+      if (still()) { gone(); return; }
+      box.addEventListener('transitionend', (ev) => { if (ev.target === box) gone(); });
+      setTimeout(gone, 800);   // a transition that never ends (a hidden tab) still leaves
+      box.classList.add('is-out');
+      box.inert = true;
+    };
+    $('[data-first-done]', box).addEventListener('click', done);
+    box.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') { ev.preventDefault(); done(); } });
+    return true;
   }
 
   // Most in need of the person first: flagged, then the files Sentinel could not stand behind.
@@ -2798,26 +2714,20 @@
     try { recent = await desktop.recentDownloads(); } catch { /* none */ }
 
     const live = info.live || { supported: false, active: false, enabled: false, reason: 'Not available' };
-    const df = info.defense || { supported: false, active: false, reason: 'Not available' };
     let ledger = [];
     try { ledger = (await desktop.defense()).ledger || []; } catch { /* none */ }
     let exposures = [];
     try { if (desktop.exposures) exposures = await desktop.exposures(); } catch { /* none */ }
-    let mine = [];
-    try { if (desktop.mySites) mine = await desktop.mySites(); } catch { /* none */ }
     // Left the page while waiting: subscribing now would leave listeners behind that nothing ever removes.
     if (!slot.isConnected) return;
     const browsers = (info.browsers && info.browsers.installed) || [];
     const running = new Set((info.browsers && info.browsers.running) || []);
-    const up = info.update || { status: 'idle' };
 
     (slot._off || []).forEach((off) => off());
     slot._off = [];
     const active = slot.contains(document.activeElement) ? document.activeElement : null;
-    const focusKey = active ? ['liveToggle', 'liveMode', 'autoScan', 'scanWith', 'defense', 'dl', 'login', 'watch', 'checkUpdate', 'restore', 'quarantine'].find((k) => k in active.dataset) : null;
+    const focusKey = active ? ['liveToggle', 'scanWith', 'restore', 'quarantine'].find((k) => k in active.dataset) : null;
     const focusValue = focusKey ? active.dataset[focusKey] : null;
-    const canDelicate = Boolean(plan().features.liveScanning);
-    const mode = info.liveMode === 'delicate' && canDelicate ? 'delicate' : 'fast';
     const fellBack = live.fellBack === 'delicate_hours_used' ? ' Delicate hours for this week are used up, so results are coming from fast scanning.' : '';
     const liveText = !live.supported ? 'Live scanning is available on Windows.'
       : live.active ? (live.window ? `Watching the browser in front. Look for the island in its bottom right corner.${live.lastResults ? ` Last search: ${live.lastResults.count} results marked.` : ''}${fellBack}` : 'Ready. It starts by itself whenever a browser is in front, and rests when none is.')
@@ -2827,13 +2737,8 @@
         <div class="live__main">
           <span class="live__mask${live.active ? ' is-on' : ''}" aria-hidden="true">${Masks.svg('scam')}</span>
           <div class="live__text"><h2>Live scanning</h2><p data-live-text>${esc(liveText)}</p>${live.counts && live.counts.checked ? `<p class="live__counts" data-live-counts>${live.counts.checked.toLocaleString()} checked since Sentinel started, ${live.counts.flagged.toLocaleString()} flagged. Private windows are not counted.</p>` : '<p class="live__counts" data-live-counts hidden></p>'}</div>
-          <div class="seg" role="group" aria-label="Scanning mode">
-            <button type="button" class="seg__btn${mode === 'fast' ? ' is-on' : ''}" data-live-mode="fast" aria-pressed="${mode === 'fast'}">Fast</button>
-            <button type="button" class="seg__btn${mode === 'delicate' ? ' is-on' : ''}" data-live-mode="delicate" aria-pressed="${mode === 'delicate'}" ${canDelicate ? '' : 'disabled title="Delicate scanning comes with Pro, Max and Ultimate"'}>Delicate</button>
-          </div>
           <button class="btn ${live.enabled ? '' : 'btn--gold'} live__button" data-live-toggle ${live.supported ? '' : 'disabled'}>${live.enabled ? 'Stop scanning' : 'Start scanning'}</button>
         </div>
-        ${live.supported && desktop.setAutoScan ? `<label class="setting live__auto"><div><b>Auto scanning</b><span>Starts fast scanning by itself whenever you open a browser, and switches off when every browser is closed.</span></div><input class="switch" type="checkbox" data-auto-scan ${info.autoScan ? 'checked' : ''}></label>` : ''}
         <ul class="live__facts">
           <li><b>Fast</b> marks results about a second after you search. <b>Delicate</b> also looks up how old each site is and whether it resolves, and takes about five seconds. Neither opens a suspicious page from this computer.</li>
           <li>Only the browser in front, and only while you are using it. Minimised, in the background or closed: nothing is read and no live time is spent.</li>
@@ -2842,45 +2747,16 @@
         </ul>
       </div>
 
-      <div class="grid2 u-mt">
-        <div class="panel">
+        <div class="panel u-mt">
           <div class="panel__head"><div><h2>Your browsers</h2><p>Pick one. Sentinel opens it if it is closed, brings it to the front, and starts scanning.</p></div></div>
           ${browsers.length ? `<ul class="list">${browsers.map((b) => `<li>
             <span class="list__icon">${ICON.globe}</span>
             <span class="list__main"><b>${esc(b.name)}</b><span data-browser-state="${esc(b.id)}">${running.has(b.id) ? 'Open now' : 'Installed'}</span></span>
             <button class="btn btn--sm btn--gold" data-scan-with="${esc(b.id)}" ${live.supported ? '' : 'disabled'}>Scan with ${esc(b.name.replace(/^(Google|Microsoft|Mozilla) /, ''))}</button>
-          </li>`).join('')}</ul>` : '<div class="empty"><p>No supported browser found on this computer.</p></div>'}
+          </li>`).join('')}</ul>` : stateBlock('unavailable', 'No supported browser found on this computer.')}
         </div>
-        <div class="panel">
-          <h2 class="u-mb">This computer</h2>
-          <label class="setting"><div><b>Defense</b><span>${esc(df.supported
-            ? (df.active ? `Watching ${(df.watched || []).join(', ')} and startup entries. A dangerous program is stopped, quarantined and its startup entries removed.` : df.reason || 'Off')
-            : 'Available on Windows.')}</span></div>
-            <input class="switch" type="checkbox" data-defense ${df.active ? 'checked' : ''} ${df.supported ? '' : 'disabled'}></label>
-          <label class="setting"><div><b>Download protection</b><span>${esc(info.downloads.active ? `Watching ${info.downloads.folder || 'Downloads'}` : info.downloads.reason || 'Off')}</span></div><input class="switch" type="checkbox" data-dl ${info.downloads.active ? 'checked' : ''}></label>
-          ${desktop.setClipboardCheck ? `<label class="setting"><div><b>Check links I copy</b><span>Copy a link from a text message, a chat or a PDF and Sentinel checks it, and warns you only if it is dangerous. Only copied web links are read; nothing else on your clipboard is sent or kept.</span></div><input class="switch" type="checkbox" data-clip ${info.clipboardCheck ? 'checked' : ''}></label>` : ''}
-          ${desktop.setCommandShield && info.platform === 'win32' ? `<label class="setting"><div><b>Stop pasted commands</b><span>Fake "I am not a robot" pages copy a command and ask you to paste it into Windows. When you copy such a command in a browser, Sentinel takes it off your clipboard and tells you, with a way to put it back. Copied in another program, it only tells you. Copied text is checked on this computer and never sent or kept.</span></div><input class="switch" type="checkbox" data-shield ${info.commandShield ? 'checked' : ''}></label>
-          ${desktop.commandPutBack ? '<div class="setting" data-held hidden><div><b>Stopped command</b><span data-held-text></span></div><button class="btn btn--sm" data-put-back>Put it back</button></div>' : ''}` : ''}
-          ${desktop.setWalletGuard && info.platform === 'win32' ? `<label class="setting"><div><b>Wallet guard</b><span>Some malware waits for you to copy a crypto wallet address or an IBAN and swaps in its own. If the address you copied changes by itself a moment later, Sentinel puts yours back and tells you. Addresses are compared on this computer, in memory, and never sent, saved or logged.</span></div><input class="switch" type="checkbox" data-wallet-guard ${info.walletGuard ? 'checked' : ''}></label>` : ''}
-          ${desktop.setSnip && info.snip && info.snip.supported ? `<div class="setting"><div><b>Check something on screen</b><span>Press the shortcut, or choose Check something on screen in the tray menu, then draw a box around a pop-up, an ad, a message, a QR code or a phone number. Sentinel reads it on this computer and tells you whether it looks like a scam. Only the links it finds are checked; the picture and the words are never sent, kept or logged.${info.snip.enabled && !info.snip.registered ? ' <strong>Another program already uses this shortcut. Choose another one.</strong>' : ''}</span>
-            <select class="input u-mt-sm" data-snip-key aria-label="Shortcut" ${info.snip.enabled ? '' : 'disabled'}>${info.snip.keys.map((k) => `<option value="${esc(k.id)}" ${k.id === info.snip.key ? 'selected' : ''}>${esc(k.label)}</option>`).join('')}</select></div>
-            <input class="switch" type="checkbox" data-snip aria-label="Check something on screen" ${info.snip.enabled ? 'checked' : ''}></div>` : ''}
-          ${desktop.setRemoteGuard && info.remoteGuard && info.remoteGuard.supported ? `<label class="setting"><div><b>Tech-support scam shield</b>${info.remoteGuard.enabled && !live.enabled ? '<span class="status is-locked">Needs live scanning</span>' : ''}<span>When a page flagged as a scam takes the whole screen, Sentinel offers to close it. When a remote-control program such as AnyDesk or TeamViewer starts soon after a flagged page, or soon after it was downloaded, Sentinel asks whether someone on the phone told you to install it. Nothing is stopped unless you say so. The way out of a full-screen page and the bank warning work while live scanning is on.${info.remoteGuard.trusted.length ? ` You use ${esc(info.remoteGuard.trusted.join(', '))} yourself.` : ''}</span></div><input class="switch" type="checkbox" data-remote-guard ${info.remoteGuard.enabled ? 'checked' : ''}></label>
-          ${info.remoteGuard.trusted.length ? '<div class="setting"><div><b>Programs you use yourself</b><span>Sentinel does not ask about these.</span></div><button class="btn btn--sm" data-forget-remote>Ask again</button></div>' : ''}` : ''}
-          ${desktop.setScanMenu && info.scanMenu && info.scanMenu.supported ? `<label class="setting"><div><b>Scan with Sentinel in the right-click menu</b><span>Right-click any file, choose Show more options, then Scan with Sentinel. The file is checked on this computer and the answer opens here.</span></div><input class="switch" type="checkbox" data-scan-menu ${info.scanMenu.enabled ? 'checked' : ''}></label>` : ''}
-          <label class="setting"><div><b>Start with my computer</b><span>Keep protection running from the moment you sign in.</span></div><input class="switch" type="checkbox" data-login ${info.openAtLogin ? 'checked' : ''}></label>
-          <div class="setting"><div><b>Sentinel ${esc(info.version)}</b><span>${esc(updateText(up))}</span></div>
-            ${up.status === 'ready' ? '<button class="btn btn--sm btn--gold" data-install-update>Restart now</button>'
-              : up.supported ? '<button class="btn btn--sm" data-check-update>Check now</button>' : ''}</div>
-          ${modelSlot(false)}
-        </div>
-      </div>
 
       ${exposurePanel(info, exposures)}
-      ${mySitesPanel(info, mine)}
-
-      ${chatSafetyPanel(info)}
-      ${textSafetyPanel(info)}
 
       <div class="grid2 u-mt">
         <div class="panel">
@@ -2894,13 +2770,13 @@
             <span class="list__main"><b>${esc(e.name || e.path || '')}</b><span>${ago(e.at)} &middot; ${esc(e.kind === 'threat' ? `${e.label}: ${(e.actions || []).map((a) => a.did).join(', ')}` : e.kind === 'suspect' ? `${e.label}: runs at startup; nothing was changed. Quarantine it if you do not recognise it.` : e.kind === 'restored' ? 'Put back' : e.kind === 'noted' ? `${e.label}: ${e.signedBy ? `signed by ${e.signedBy}, ` : ''}noted, nothing touched` : `Clean (${e.how || 'scanned'})`)}</span></span>
             ${e.kind === 'threat' && !e.restored && (e.quarantined || (e.actions || []).some((a) => a.undo)) ? `<button class="btn btn--sm" data-restore="${esc(e.id)}">Put back</button>` : ''}
             ${e.kind === 'suspect' ? `<button class="btn btn--sm" data-suspect="${esc(e.id)}">Quarantine</button>` : ''}
-          </li>`).join('')}</ul>` : '<div class="empty"><p>Nothing has needed stopping.</p></div>'}
+          </li>`).join('')}</ul>` : stateBlock('waiting', 'Nothing yet. Each file Sentinel scans, and anything it stops, is listed here.')}
         </div>
       </div>
 
       <div class="panel u-mt" id="downloads">
         <h2 class="u-mb">Recent downloads</h2>
-        ${recent.length ? `<ul class="list">${[...recent].sort((a, b) => downloadRank(b) - downloadRank(a)).slice(0, 8).map(downloadRow).join('')}</ul>` : '<div class="empty"><p>New downloads will appear here once they are scanned.</p></div>'}
+        ${recent.length ? `<ul class="list">${[...recent].sort((a, b) => downloadRank(b) - downloadRank(a)).slice(0, 8).map(downloadRow).join('')}</ul>` : stateBlock('waiting', 'New downloads will appear here once they are scanned.')}
       </div>`;
 
     if (focusKey) {
@@ -2914,18 +2790,7 @@
       const part = $(`#${id}`, slot);
       if (part) part.scrollIntoView({ block: 'start' });
     }
-    bindChatSafety(slot);
     bindExposures(slot);
-    bindMySites(slot);
-    bindTextSafety(slot);
-    const defEl = $('[data-defense]', slot);
-    if (defEl && !defEl.disabled) defEl.addEventListener('change', async (ev) => {
-      try {
-        const s = await desktop.setDefense(ev.target.checked);
-        toast(s.active ? 'Defense is on.' : (s.reason || 'Defense is off.'), s.active ? 'success' : 'info');
-      } catch (err) { ev.target.checked = !ev.target.checked; toast(desktopError(err), 'error'); }
-      renderDesktopControls(slot);
-    });
     $$('[data-suspect]', slot).forEach((b) => b.addEventListener('click', async () => {
       b.disabled = true;
       try { await desktop.quarantineSuspect(b.dataset.suspect); toast('Quarantined. You can put it back from here.', 'success'); renderDesktopControls(slot); }
@@ -2947,19 +2812,6 @@
         while (feed.children.length > 8) feed.lastElementChild.remove();
       }));
     }
-    $$('[data-live-mode]', slot).forEach((b) => b.addEventListener('click', async () => {
-      if (b.disabled || b.classList.contains('is-on')) return;
-      try { await desktop.setLiveMode(b.dataset.liveMode); } catch (err) { toast(desktopError(err), 'error'); }
-      renderDesktopControls(slot);
-    }));
-    const auto = $('[data-auto-scan]', slot);
-    if (auto) auto.addEventListener('change', async () => {
-      try {
-        await desktop.setAutoScan(auto.checked);
-        toast(auto.checked ? 'Auto scanning is on. Open a browser and Sentinel starts scanning it.' : 'Auto scanning is off.', 'success');
-      } catch (err) { auto.checked = !auto.checked; toast(desktopError(err), 'error'); }
-      renderDesktopControls(slot);
-    });
     const toggle = $('[data-live-toggle]', slot);
     if (toggle && !toggle.disabled) toggle.addEventListener('click', () => busy(toggle, live.enabled ? 'Stopping' : 'Starting', async () => {
       try {
@@ -3001,100 +2853,6 @@
     for (const name of ['onDefense', 'onUpdate', 'onDownloadThreat', 'onSettings']) {
       if (desktop[name]) slot._off.push(desktop[name](() => { if (slot.isConnected) renderDesktopControls(slot); }));
     }
-    $('[data-dl]', slot).addEventListener('change', async (ev) => {
-      try {
-        const s = await desktop.setDownloadProtection(ev.target.checked);
-        toast(s.active ? 'Download protection is on.' : (s.reason || 'Download protection is off.'), s.active ? 'success' : 'info');
-      } catch (err) { ev.target.checked = !ev.target.checked; toast(desktopError(err), 'error'); }
-    });
-    $('[data-login]', slot).addEventListener('change', async (ev) => {
-      try { await desktop.setOpenAtLogin(ev.target.checked); } catch (err) { ev.target.checked = !ev.target.checked; toast(desktopError(err), 'error'); }
-    });
-    const scanMenu = $('[data-scan-menu]', slot);
-    if (scanMenu) scanMenu.addEventListener('change', async () => {
-      try {
-        await desktop.setScanMenu(scanMenu.checked);
-        toast(scanMenu.checked ? 'Scan with Sentinel is in the right-click menu.' : 'Scan with Sentinel is no longer in the right-click menu.', 'success');
-      } catch (err) { scanMenu.checked = !scanMenu.checked; toast(desktopError(err), 'error'); }
-    });
-    const clip = $('[data-clip]', slot);
-    if (clip) clip.addEventListener('change', async () => {
-      try {
-        await desktop.setClipboardCheck(clip.checked);
-        toast(clip.checked ? 'Check links I copy is on. Copy a link and Sentinel checks it.' : 'Check links I copy is off.', 'success');
-      } catch (err) { clip.checked = !clip.checked; toast(desktopError(err), 'error'); }
-    });
-    const walletSwitch = $('[data-wallet-guard]', slot);
-    if (walletSwitch) walletSwitch.addEventListener('change', async () => {
-      try {
-        await desktop.setWalletGuard(walletSwitch.checked);
-        toast(walletSwitch.checked ? 'Wallet guard is on.' : 'Wallet guard is off.', 'success');
-      } catch (err) { walletSwitch.checked = !walletSwitch.checked; toast(desktopError(err), 'error'); }
-    });
-    const snipSwitch = $('[data-snip]', slot);
-    const snipKey = $('[data-snip-key]', slot);
-    const setSnip = async (said) => {
-      try {
-        const s = await desktop.setSnip(snipSwitch.checked, snipKey.value);
-        snipKey.disabled = !s.enabled;
-        if (s.enabled && !s.registered) toast('Another program already uses this shortcut. Choose another one.', 'error');
-        else toast(said(s), 'success');
-      } catch (err) { toast(desktopError(err), 'error'); }
-    };
-    if (snipSwitch) snipSwitch.addEventListener('change', () => setSnip((s) => (s.enabled ? 'Check something on screen is on.' : 'Check something on screen is off.')));
-    if (snipKey) snipKey.addEventListener('change', () => setSnip(() => 'Shortcut changed.'));
-    const shieldSwitch = $('[data-shield]', slot);
-    if (shieldSwitch) shieldSwitch.addEventListener('change', async () => {
-      try {
-        await desktop.setCommandShield(shieldSwitch.checked);
-        toast(shieldSwitch.checked ? 'Stop pasted commands is on.' : 'Stop pasted commands is off.', 'success');
-      } catch (err) { shieldSwitch.checked = !shieldSwitch.checked; toast(desktopError(err), 'error'); }
-    });
-    // "Put it back" under the switch, for the two minutes Sentinel holds a stopped command (the notification has it too).
-    const heldRow = $('[data-held]', slot);
-    if (heldRow) {
-      let hideTimer = null;
-      const showHeld = (h) => {
-        clearTimeout(hideTimer);
-        heldRow.hidden = !h || h.until <= Date.now();
-        if (heldRow.hidden) return;
-        const at = new Date(h.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-        $('[data-held-text]', heldRow).textContent = `Taken off your clipboard at ${at}${h.host ? `, copied from ${h.host}` : ''}. ${h.reason}. If you trust it, you can put it back for two minutes.`;
-        hideTimer = setTimeout(() => { heldRow.hidden = true; }, h.until - Date.now());
-      };
-      showHeld(info.commandHeld);
-      if (desktop.onCommand) slot._off.push(desktop.onCommand((h) => { if (slot.isConnected) showHeld(h); }));
-      $('[data-put-back]', heldRow).addEventListener('click', async () => {
-        try {
-          const r = await desktop.commandPutBack();
-          toast(r.ok ? `The command is back on your clipboard. ${r.message}` : r.message, r.ok ? 'success' : 'info');
-        } catch (err) { toast(desktopError(err), 'error'); }
-      });
-    }
-    const shield = $('[data-remote-guard]', slot);
-    if (shield) shield.addEventListener('change', async () => {
-      try {
-        await desktop.setRemoteGuard(shield.checked);
-        toast(shield.checked ? 'The tech-support scam shield is on.' : 'The tech-support scam shield is off.', 'success');
-      } catch (err) { shield.checked = !shield.checked; toast(desktopError(err), 'error'); }
-    });
-    const forget = $('[data-forget-remote]', slot);
-    if (forget) forget.addEventListener('click', async () => {
-      try { await desktop.forgetTrustedRemote(); toast('Sentinel will ask about remote-control programs again.', 'success'); renderDesktopControls(slot); }
-      catch (err) { toast(desktopError(err), 'error'); }
-    });
-
-    const check = $('[data-check-update]', slot);
-    if (check) check.addEventListener('click', () => busy(check, 'Checking', async () => {
-      let s;
-      try { s = await desktop.checkUpdates(); } catch (err) { toast(desktopError(err), 'error'); return; }
-      toast(s.status === 'current' ? 'Sentinel is up to date.' : s.status === 'error' ? 'Could not check for updates. Try again later.' : 'Checking for a newer version…', s.status === 'error' ? 'error' : 'info');
-      renderDesktopControls(slot);
-    }));
-    const install = $('[data-install-update]', slot);
-    if (install) install.addEventListener('click', () => desktop.installUpdate());
-    mountModels(slot);
-
     $$('[data-quarantine]', slot).forEach((b) => b.addEventListener('click', async () => {
       try {
         await desktop.quarantine(b.dataset.quarantine);
@@ -3151,48 +2909,296 @@
     })));
   }
 
-  /* ============================================================ security */
+  /* ============================================================ settings */
 
-  async function securityView(el) {
+  /*
+   * Settings: one home for every choice Sentinel offers. Each row is one object, and the same list draws the page,
+   * filters it as you type and feeds the search palette, so a setting is found by its words wherever it is asked for.
+   * A row that cannot work here says why in place of working: its control disabled, never hidden, never shown as on.
+   * A change is saved when it is pressed; a failed save puts the control back and says why.
+   * The groups are fixed. The accent and look picker adds its rows to 'look', motion and the scan effect to 'moving'.
+   */
+  const SETTING_GROUPS = [
+    ['look', 'Appearance'], ['moving', 'Motion'], ['protection', 'Live protection'], ['guards', 'Everyday guards'],
+    ['chat', 'Chat and texts'], ['alerts', 'Alerts'], ['lock', 'Parent lock'], ['account', 'Account and security'], ['data', 'Your data'], ['plan', 'Plan and app'], ['help', 'Help']
+  ];
+  const NEEDS_APP = 'Needs the Sentinel app for Windows.';
+  /** Why a row that needs the Windows app cannot work here, or '' when it can. */
+  function appWhy(info, method) {
+    if (!desktop) return NEEDS_APP;
+    if (!desktop[method]) return 'Needs a newer Sentinel app. It updates by itself.';
+    if (!info) return 'The Sentinel app did not answer. Open this page again.';
+    return '';
+  }
+  const liveOf = (info) => (info && info.live) || { supported: false, enabled: false };
+  const onWindows = (ok) => (ok ? '' : 'Needs Windows.');
+  /** A switch saved through the app: `on` reads it, `off` says why it cannot work (past needing the app), `said` is the toast. */
+  const appSwitch = (o) => ({ ...o, kind: 'switch', app: true, why: (info) => appWhy(info, o.method) || (o.off ? o.off(info) : '') });
+  /** One of three words saved through the app (Marks beside links, Pop-up warnings): `key` reads it, `said` and `state` per word. */
+  const levelRow = (o) => ({ ...o, kind: 'custom', app: true,
+    why: (i) => appWhy(i, o.method) || onWindows(liveOf(i).supported),
+    state: (i) => o.state[i[o.key]] || '',
+    control: (i) => seg(`set-${o.id}-l`, o.options, i[o.key]),
+    bind: (row, info, ctx) => $$('[data-seg]', row).forEach((b) => b.addEventListener('click', async () => {
+      if (b.getAttribute('aria-pressed') === 'true') return;
+      $$('[data-seg]', row).forEach((x) => { x.disabled = true; });
+      try { toast(o.said[await desktop[o.method](b.dataset.seg)], 'success'); } catch (err) { toast(desktopError(err), 'error'); }
+      ctx.refresh();
+    })) });
+  const seg = (labelId, options, current) => `<div class="seg" role="group" aria-labelledby="${labelId}">${options.map(([v, name, off]) => `<button type="button" class="seg__btn${v === current ? ' is-on' : ''}" data-seg="${v}" aria-pressed="${v === current}" ${off ? 'disabled' : ''}>${name}</button>`).join('')}</div>`;
+  const facts = (summary, items) => `<details class="set-facts"><summary>${summary}</summary><ul>${items.map(([b, t]) => `<li><b>${b}</b> ${t}</li>`).join('')}</ul></details>`;
+  const linkControl = (href) => `<a class="btn btn--sm" href="${href}">Open</a>`;
+
+  const SETTINGS = [
+    // The look (look.js): its picker draws both rows, Theme as its radio well and Colour as its coins.
+    { id: 'theme', group: 'look', kind: 'block', label: 'Theme', hint: 'Auto follows your computer. Light or Dark stays as you choose it.',
+      words: ['dark', 'light', 'mode', 'night', 'appearance'],
+      mount: (body) => { if (window.SentinelLook && SentinelLook.picker) body.appendChild(SentinelLook.picker({ only: 'mode' })); } },
+    { id: 'accent', group: 'look', kind: 'block', label: 'Colour',
+      hint: desktop ? 'One colour for this app, live scanning, its warnings, the mask in the corner, the tray icon and the companion in your browser.' : 'One colour for the whole app. In the Sentinel app for Windows it also colours live scanning and its warnings.',
+      words: ['colour', 'color', 'accent', 'gold', 'rose', 'amethyst', 'sapphire', 'teal', 'platinum', 'appearance'],
+      mount: (body) => { if (window.SentinelLook && SentinelLook.picker) body.appendChild(SentinelLook.picker({ only: 'accent' })); } },
+    { id: 'simple-view', group: 'look', kind: 'switch', label: 'Simple view', hint: 'Fewer pages and fewer words. A check shows its answer and what to do, in bigger type, with the details one press away. On this device.',
+      words: ['simple', 'easy', 'less', 'basic', 'bigger', 'large', 'older', 'beginner', 'clutter', 'plain'],
+      on: () => simpleView(), save: (input) => window.SentinelSimple.set(input.checked),
+      said: (on) => (on ? 'Simple view is on. Pages you may not need are tucked away; search still finds every one.' : 'Simple view is off. Every page and detail is back.') },
+    { id: 'text-size', group: 'look', kind: 'custom', label: 'Text size', hint: 'Larger words in the app, on the website and in Sentinel\'s warnings, on this device. Headings stay as they are.',
+      words: ['font', 'bigger', 'larger', 'read', 'reading', 'eyes', 'zoom', 'small', 'accessibility'],
+      control: () => seg('set-text-size-l', [['standard', 'Standard'], ['large', 'Large'], ['larger', 'Larger']], window.SentinelType ? window.SentinelType.get().text : 'standard'),
+      bind: (row, info, ctx) => $$('[data-seg]', row).forEach((b) => b.addEventListener('click', () => { if (window.SentinelType) window.SentinelType.set({ text: b.dataset.seg }); ctx.draw(); })) },
+    { id: 'density', group: 'look', kind: 'custom', label: 'Spacing', hint: 'Compact fits more on one screen. Buttons stay easy to press.',
+      words: ['compact', 'dense', 'density', 'comfortable', 'padding', 'space', 'tight'],
+      control: () => seg('set-density-l', [['comfortable', 'Comfortable'], ['compact', 'Compact']], window.SentinelType ? window.SentinelType.get().density : 'comfortable'),
+      bind: (row, info, ctx) => $$('[data-seg]', row).forEach((b) => b.addEventListener('click', () => { if (window.SentinelType) window.SentinelType.set({ density: b.dataset.seg }); ctx.draw(); })) },
+
+    // Motion (boot.js SentinelMotionLevel): its own control, Animation (Full, Calm, Off) and the Scan effect switch. The
+    // row's heading names it, so the control's own name is kept for screen readers only.
+    { id: 'motion', group: 'moving', kind: 'block', label: 'Animation', hint: `How much Sentinel moves on this ${desktop ? 'computer, here and over your browser' : 'device'}. Off whenever your computer asks for less motion.`,
+      words: ['animation', 'animations', 'motion', 'reduce', 'still', 'calm', 'effects', 'moving', 'scan effect', 'digits', 'glitch', 'binary'],
+      mount: (body) => {
+        if (!window.SentinelMotionLevel) return;
+        const c = window.SentinelMotionLevel.control();
+        const name = $('.setting b', c);
+        if (name) name.classList.add('sr-only');
+        body.append(c);
+      } },
+
+    { id: 'live-mode', group: 'protection', kind: 'custom', app: true, label: 'Scanning mode', hint: 'Fast marks search results about a second after you search. Delicate also looks up how old each site is and whether it resolves, and takes about five seconds.',
+      words: ['fast', 'delicate', 'live', 'speed', 'research', 'search results'],
+      why: (i) => appWhy(i, 'setLiveMode') || onWindows(liveOf(i).supported) || (plan().features.liveScanning || plan().features.liveFast ? '' : 'Live scanning is not in your plan. See Plan and usage below.'),
+      state: () => (plan().features.liveScanning ? '' : 'Delicate comes with Pro, Max and Ultimate.'),
+      control: (i) => { const can = Boolean(plan().features.liveScanning); return seg('set-live-mode-l', [['fast', 'Fast'], ['delicate', 'Delicate', !can]], i.liveMode === 'delicate' && can ? 'delicate' : 'fast'); },
+      bind: (row, info, ctx) => $$('[data-seg]', row).forEach((b) => b.addEventListener('click', async () => {
+        if (b.getAttribute('aria-pressed') === 'true') return;
+        $$('[data-seg]', row).forEach((x) => { x.disabled = true; });
+        try { await desktop.setLiveMode(b.dataset.seg); toast(b.dataset.seg === 'delicate' ? 'Live scanning is delicate now.' : 'Live scanning is fast now.', 'success'); } catch (err) { toast(desktopError(err), 'error'); }
+        ctx.refresh();
+      })) },
+    levelRow({ id: 'marks-beside-links', group: 'protection', label: 'Marks beside links', method: 'setMarksLevel', key: 'marksLevel',
+      hint: 'Sentinel checks every link either way. This only changes which ones get a mark. A warning or danger mark always shows.',
+      words: ['marks', 'ticks', 'tick', 'safe', 'busy', 'clutter', 'quiet', 'search results', 'less', 'density'],
+      options: [['all', 'Every link'], ['risky', 'Risky links'], ['danger', 'Serious only']],
+      said: { all: 'Every link gets a mark. Safe ones get a small tick.', risky: 'Risky links get a mark. Safe ones get none.', danger: 'Only warning and danger links get a mark.' },
+      state: { all: 'Safe links get a small tick, so every result shows its answer.', risky: 'Caution, warning and danger links get a mark. Safe links get none.', danger: 'Only warning and danger links get a mark. The corner island still counts every link.' } }),
+    appSwitch({ id: 'auto-scan', group: 'protection', label: 'Auto scanning', hint: 'Starts fast scanning by itself whenever you open a browser, and stops when every browser is closed.',
+      words: ['automatic', 'browser', 'start', 'live'], method: 'setAutoScan', hook: 'auto-scan', on: (i) => i.autoScan, off: (i) => onWindows(liveOf(i).supported),
+      said: (on) => (on ? 'Auto scanning is on. Open a browser and Sentinel starts scanning it.' : 'Auto scanning is off.') }),
+    appSwitch({ id: 'download-protection', group: 'protection', label: 'Download protection', hint: 'Every new file in your Downloads folder is inspected on your computer.',
+      words: ['downloads', 'files', 'folder', 'virus', 'malware'], method: 'setDownloadProtection', hook: 'dl', on: (i) => i.downloads && i.downloads.active,
+      state: (i) => (i.downloads && i.downloads.active ? `Watching ${i.downloads.folder || 'Downloads'}.` : (i.downloads && i.downloads.reason) || ''),
+      said: (on, r) => (on ? 'Download protection is on.' : (r && r.reason) || 'Download protection is off.') }),
+    appSwitch({ id: 'defense-watch', group: 'protection', label: 'Defense', hint: 'Watches new programs and startup entries. A dangerous program is stopped, quarantined and its startup entries removed.',
+      words: ['startup', 'quarantine', 'malware', 'program', 'virus', 'stop'], method: 'setDefense', hook: 'defense', on: (i) => i.defense && i.defense.active, off: (i) => onWindows(i.defense && i.defense.supported),
+      state: (i) => (i.defense.active ? `Watching ${(i.defense.watched || []).join(', ')} and startup entries.` : i.defense.reason || ''),
+      said: (on, r) => (on ? 'Defense is on.' : (r && r.reason) || 'Defense is off.') }),
+    appSwitch({ id: 'my-sites', group: 'protection', label: 'Your sites', hint: 'Sentinel knows the big brands. Here it learns yours: your bank or credit union, your school portal, your work sign-in. A link or page made to look like one of them gets a warning.',
+      words: ['bank', 'look-alike', 'lookalike', 'credit union', 'school', 'fake', 'sites', 'impersonation'], method: 'setMySites', hook: 'my-sites', on: (i) => i.mySites !== false,
+      off: (i) => (i.embeddedServer ? '' : 'Available when the app uses its own scanner on this computer.'),
+      said: (on, r) => (on ? 'Your sites: on. Sentinel will learn the sites you use.' : r && r.erased === false ? 'Your sites: off. The sites could not be erased just now, so Sentinel will try again each time it starts.' : 'Your sites: off. Every site is forgotten.'),
+      body: (i, data) => `${i.mySites !== false ? `<form class="set-sub set-add" data-my-sites-add>
+          <input class="input mono" name="host" placeholder="mycu.org" aria-label="A site you use" autocomplete="off" spellcheck="false" maxlength="300" required>
+          <button class="btn btn--gold btn--sm" type="submit">Add site</button></form>
+        ${data.mine.length ? `<ul class="list">${data.mine.map((s) => `<li><span class="list__main"><b class="mono">${esc(s.host)}</b><span>${s.source === 'you' ? 'Added by you' : 'Learned: you use it often'}</span></span><button class="btn btn--sm" type="button" data-my-site-remove="${esc(s.host)}">Remove</button></li>`).join('')}</ul>
+          <div class="set-sub"><span class="muted">${data.mine.length} site${data.mine.length === 1 ? '' : 's'}</span><button class="btn btn--sm" type="button" data-my-sites-forget>Forget all</button></div>`
+          : '<p class="set-row__state">None yet. A site you visit on three different days is added by itself, or add one now.</p>'}` : ''}
+        ${facts('How they are kept', [['On this computer only,', 'as plain site names you can read here. A site you passed through is never written down: until it has been seen on three days, only a scrambled code of it is kept.'], ['Learned only from safe pages,', 'never from a private window. Turning this off forgets every site.']])}`,
+      bind: (row, info, ctx) => {
+        const form = $('[data-my-sites-add]', row);
+        if (form) form.addEventListener('submit', async (ev) => {
+          ev.preventDefault();
+          try { await desktop.addMySite(form.elements.host.value); toast('Added. Look-alikes of it now get a warning.', 'success'); ctx.refresh(); }
+          catch (err) { form.elements.host.setAttribute('aria-invalid', 'true'); toast(desktopError(err), 'error'); }
+        });
+        $$('[data-my-site-remove]', row).forEach((b) => b.addEventListener('click', async () => {
+          b.disabled = true;
+          try { await desktop.removeMySite(b.dataset.mySiteRemove); ctx.refresh(); } catch (err) { b.disabled = false; toast(desktopError(err), 'error'); }
+        }));
+        const forget = $('[data-my-sites-forget]', row);
+        if (forget) forget.addEventListener('click', async () => {
+          try { await desktop.forgetMySites(); toast('Every site is forgotten.', 'success'); ctx.refresh(); } catch (err) { toast(desktopError(err), 'error'); }
+        });
+      } }),
+    appSwitch({ id: 'scan-menu', group: 'protection', label: 'Scan with Sentinel in the right-click menu', hint: 'Right-click any file, choose Show more options, then Scan with Sentinel. The file is checked on this computer and the answer opens here.',
+      words: ['context menu', 'explorer', 'file', 'right click'], method: 'setScanMenu', hook: 'scan-menu', on: (i) => i.scanMenu && i.scanMenu.enabled, off: (i) => onWindows(i.scanMenu && i.scanMenu.supported),
+      said: (on) => (on ? 'Scan with Sentinel is in the right-click menu.' : 'Scan with Sentinel is no longer in the right-click menu.') }),
+    appSwitch({ id: 'start-with-computer', group: 'protection', label: 'Start with my computer', hint: 'Keeps protection running from the moment you sign in to Windows.',
+      words: ['startup', 'boot', 'login', 'sign in', 'launch'], method: 'setOpenAtLogin', hook: 'login', on: (i) => i.openAtLogin,
+      said: (on) => (on ? 'Sentinel starts with your computer.' : 'Sentinel no longer starts with your computer.') }),
+
+    appSwitch({ id: 'copied-links', group: 'guards', label: 'Check links I copy', hint: 'Copy a link from a text message, a chat or a PDF and Sentinel checks it, and warns you only if it is dangerous. Only copied web links are read; nothing else on your clipboard is sent or kept.',
+      words: ['clipboard', 'copy', 'paste', 'link'], method: 'setClipboardCheck', hook: 'clip', on: (i) => i.clipboardCheck,
+      said: (on) => (on ? 'Check links I copy is on. Copy a link and Sentinel checks it.' : 'Check links I copy is off.') }),
+    appSwitch({ id: 'pasted-commands', group: 'guards', label: 'Stop pasted commands', hint: 'Fake "I am not a robot" pages copy a command and ask you to paste it into Windows. Copied in a browser, Sentinel takes it off your clipboard and tells you, with a way to put it back; copied in another program, it only tells you. Checked on this computer, never sent or kept.',
+      words: ['clickfix', 'captcha', 'robot', 'powershell', 'command', 'clipboard', 'run'], method: 'setCommandShield', hook: 'shield', on: (i) => i.commandShield, off: (i) => onWindows(i.platform === 'win32'),
+      said: (on) => (on ? 'Stop pasted commands is on.' : 'Stop pasted commands is off.'),
+      // For the two minutes Sentinel holds a stopped command, the way to put it back (the notification has it too).
+      body: (i) => {
+        const held = i.commandHeld;
+        if (!held || held.until <= Date.now() || !desktop.commandPutBack) return '';
+        const at = new Date(held.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+        return `<div class="set-sub"><p>Taken off your clipboard at ${esc(at)}${held.host ? `, copied from ${esc(held.host)}` : ''}. ${esc(held.reason)}. If you trust it, you can put it back for two minutes.</p><button class="btn btn--sm" type="button" data-put-back>Put it back</button></div>`;
+      },
+      bind: (row, info, ctx) => {
+        const b = $('[data-put-back]', row);
+        if (!b) return;
+        const t = setTimeout(ctx.draw, Math.max(0, info.commandHeld.until - Date.now()) + 50);
+        ctx.offs.push(() => clearTimeout(t));
+        b.addEventListener('click', async () => {
+          try { const r = await desktop.commandPutBack(); toast(r.ok ? `The command is back on your clipboard. ${r.message}` : r.message, r.ok ? 'success' : 'info'); } catch (err) { toast(desktopError(err), 'error'); }
+        });
+      } }),
+    appSwitch({ id: 'wallet-guard', group: 'guards', label: 'Wallet guard', hint: 'Some malware waits for you to copy a crypto wallet address or an IBAN and swaps in its own. If the address you copied changes by itself a moment later, Sentinel puts yours back and tells you. Compared in memory, never sent, saved or logged.',
+      words: ['crypto', 'bitcoin', 'iban', 'bank', 'address', 'clipboard', 'swap'], method: 'setWalletGuard', hook: 'wallet-guard', on: (i) => i.walletGuard, off: (i) => onWindows(i.platform === 'win32'),
+      said: (on) => (on ? 'Wallet guard is on.' : 'Wallet guard is off.') }),
+    appSwitch({ id: 'remote-guard', group: 'guards', label: 'Tech-support scam shield', hint: 'When a page flagged as a scam takes the whole screen, Sentinel offers to close it. When a remote-control program such as AnyDesk or TeamViewer starts soon after a flagged page, or soon after it was downloaded, Sentinel asks whether someone on the phone told you to install it. Nothing is stopped unless you say so.',
+      words: ['anydesk', 'teamviewer', 'remote', 'support', 'phone', 'full screen', 'popup'], method: 'setRemoteGuard', hook: 'remote-guard', on: (i) => i.remoteGuard && i.remoteGuard.enabled, off: (i) => onWindows(i.remoteGuard && i.remoteGuard.supported),
+      state: (i) => (i.remoteGuard.enabled && !liveOf(i).enabled ? 'Needs live scanning: the way out of a full-screen page and the bank warning work while live scanning is on.' : ''),
+      said: (on) => (on ? 'The tech-support scam shield is on.' : 'The tech-support scam shield is off.'),
+      body: (i) => { const t = i.remoteGuard.trusted || []; return t.length ? `<div class="set-sub"><p>You use ${esc(t.join(', '))} yourself, so Sentinel does not ask about ${t.length === 1 ? 'it' : 'them'}.</p><button class="btn btn--sm" type="button" data-forget-remote>Ask again</button></div>` : ''; },
+      bind: (row, info, ctx) => {
+        const b = $('[data-forget-remote]', row);
+        if (b) b.addEventListener('click', async () => {
+          try { await desktop.forgetTrustedRemote(); toast('Sentinel will ask about remote-control programs again.', 'success'); ctx.refresh(); } catch (err) { toast(desktopError(err), 'error'); }
+        });
+      } }),
+    appSwitch({ id: 'snip', group: 'guards', label: 'Check something on screen', hint: 'Press the shortcut, or choose Check something on screen in the tray menu, then draw a box around a pop-up, an ad, a message, a QR code or a phone number. Sentinel reads it on this computer and tells you whether it looks like a scam. Only the links it finds are checked; the picture and the words are never sent or kept.',
+      words: ['screenshot', 'snip', 'shortcut', 'keyboard', 'qr', 'popup', 'screen'], method: 'setSnip', hook: 'snip', on: (i) => i.snip.enabled, off: (i) => onWindows(i.snip && i.snip.supported),
+      state: (i) => (i.snip.enabled && !i.snip.registered ? 'Another program already uses this shortcut. Choose another one.' : ''),
+      save: (input, row) => desktop.setSnip(input.checked, $('[data-snip-key]', row).value),
+      said: (on, r) => (r && r.enabled && !r.registered ? 'Another program already uses this shortcut. Choose another one.' : on ? 'Check something on screen is on.' : 'Check something on screen is off.'),
+      body: (i) => `<label class="set-sub"><span>Shortcut</span><select class="input" data-snip-key ${i.snip.enabled ? '' : 'disabled'}>${i.snip.keys.map((k) => `<option value="${esc(k.id)}" ${k.id === i.snip.key ? 'selected' : ''}>${esc(k.label)}</option>`).join('')}</select></label>`,
+      bind: (row, info, ctx) => {
+        const key = $('[data-snip-key]', row);
+        key.addEventListener('change', async () => {
+          try {
+            const s = await desktop.setSnip($('.switch', row).checked, key.value);
+            toast(s.enabled && !s.registered ? 'Another program already uses this shortcut. Choose another one.' : 'Shortcut changed.', s.enabled && !s.registered ? 'error' : 'success');
+          } catch (err) { toast(desktopError(err), 'error'); }
+          ctx.refresh();
+        });
+      } }),
+
+    appSwitch({ id: 'chat-safety', group: 'chat', label: 'Chat safety: Roblox and Discord', hint: 'Points out scams and people who may not be safe to talk to (someone asking a child to keep secrets, to send pictures, to move to another app, or to meet), right beside the message, while Roblox or the Discord app is in front.',
+      words: ['roblox', 'discord', 'child', 'children', 'kids', 'games', 'grooming', 'messages', 'family'], method: 'setChatSafety', hook: 'chat-safety', on: (i) => i.chatSafety && i.chatSafety.enabled, off: (i) => onWindows(i.chatSafety && i.chatSafety.supported),
+      seen: 'chat-seen', state: (i) => chatSeenText(i.chatSafety), down: (i) => Boolean(i.chatSafety.enabled && readerDown(i.chatSafety, '')),
+      said: (on) => (on ? CHAT_ON : 'Chat safety is off.'), saved: () => markAsked('chat'),
+      body: () => facts('What it reads, and what it never does', [
+        ['Read on this computer only.', 'Messages are read from the screen as they appear, judged here and forgotten. No message, name or game is sent to Sentinel or anyone else, saved, or logged.'],
+        ['Always plain to see.', 'A Sentinel badge shows while chat is watched. In a Roblox game it shows only when you open the Esc menu, so it never covers the game; warnings sit small, beside the chat box.'],
+        ['Never in the way.', 'Nothing is read while a game\'s chat is closed. Sentinel never changes Roblox or Discord, never types or clicks in them, and only speaks up when a message is suspicious.']]) }),
+    appSwitch({ id: 'text-safety', group: 'chat', label: 'Check my texts', hint: 'If your phone\'s texts show on this computer through Phone Link, Sentinel points out English scam texts (unpaid tolls, parcel fees, "Hi Mum, this is my new number", "your account is locked") right beside the message, while Phone Link is in front.',
+      words: ['sms', 'phone link', 'text messages', 'phone', 'toll', 'parcel'], method: 'setTextSafety', hook: 'text-safety', on: (i) => i.textSafety && i.textSafety.enabled, off: (i) => onWindows(i.textSafety && i.textSafety.supported),
+      seen: 'text-seen', state: (i) => textSeenText(i.textSafety), down: (i) => Boolean(i.textSafety.enabled && readerDown(i.textSafety, '')),
+      said: (on) => (on ? 'Check my texts is on. Open a conversation in Phone Link and Sentinel checks it.' : 'Check my texts is off.'),
+      body: () => facts('What it reads, and what it never does', [
+        ['Read on this computer only.', 'The conversation on screen is read as it appears, judged here and forgotten. No text, name or number is sent to Sentinel or anyone else, saved, or logged.'],
+        ['Links checked, never opened.', 'A link in a text is checked by its address, the way a copied link is. It is not added to your history.'],
+        ['Never in the way.', 'Only texts you received are checked. Sentinel never types, clicks or replies in Phone Link.'],
+        ['English texts for now.', 'Sentinel knows the wording of scam texts in English only, and Phone Link needs to show a left-to-right language.']]) }),
+
+    levelRow({ id: 'warn-level', group: 'alerts', label: 'Pop-up warnings', method: 'setWarningsLevel', key: 'warningsLevel',
+      hint: 'When a page you open looks like a warning or a danger, Sentinel tells you with a notification and a small card in the corner. Whatever you choose, the page is still marked in the corner, and Sentinel still asks before you pay with gift cards or crypto, or after you typed a password on it.',
+      words: ['notifications', 'notification', 'alerts', 'loud', 'quiet', 'popup', 'pop up', 'card', 'interrupt', 'warn'],
+      options: [['all', 'Always'], ['danger', 'Danger only'], ['quiet', 'Never']],
+      said: { all: 'Sentinel warns you about warning and danger pages.', danger: 'Sentinel warns you only about danger pages.', quiet: 'No more pop-up warnings. Flagged pages are still marked in the corner.' },
+      state: { all: 'A notification and a card for every warning or danger page.', danger: 'A warning page is marked in the corner, without a notification or a card.', quiet: 'Nothing pops up. A flagged page is marked in the corner only, so look there before you sign in or pay.' } }),
+    appSwitch({ id: 'exposure-alerts', group: 'alerts', label: 'Exposure alerts', hint: 'A scam page often reaches the threat lists hours or days after it goes up. With this on, Sentinel remembers the sites live scanning found safe for 14 days, and tells you if a list names one of them afterwards, with what to do.',
+      words: ['listed', 'later', 'visited', 'history', 'warning', 'notification'], method: 'setExposureAlerts', hook: 'exposure-alerts', on: (i) => i.exposureAlerts, off: (i) => (liveOf(i).supported ? '' : 'Needs Windows, with live scanning.'),
+      state: (i) => (i.exposureAlerts && !liveOf(i).enabled ? 'On, but live scanning is off, so no sites are being remembered.' : ''),
+      said: (on, r) => (on ? EXPOSURE_ON : r && r.erased === false ? 'Exposure alerts are off. The remembered sites could not be erased just now, so Sentinel will try again each time it starts.' : 'Exposure alerts are off. Every remembered site is erased.'),
+      saved: () => markAsked('exposure'),
+      body: (i) => {
+        // The marks live with whichever Sentinel server the app uses: its own, on this computer, or one set up for it.
+        let where = 'on this computer';
+        if (!i.embeddedServer) { try { where = `on the Sentinel server this app uses (${new URL(i.origin).host})`; } catch { where = 'on the Sentinel server this app uses'; } }
+        return facts('How sites are remembered', [
+          [`Kept ${esc(where)}`, 'as a scrambled code of each site&rsquo;s name and the day, never the address or the time, and erased after 14 days. Turning this off erases every one, and every alert found so far. The copies Sentinel keeps to repair its accounts file can hold them for up to 7 more days.'],
+          ['Private windows are never remembered.', 'Pages on shared sites (a Google Sites page, a Netlify site) are left out, since one bad page there says nothing about the one you saw.']]);
+      } }),
+    appSwitch({ id: 'week-note', group: 'alerts', label: 'A note about your week', hint: 'Once a week, a Windows notification with last week in one line. Never while a game or video is full screen.',
+      words: ['weekly', 'notification', 'summary', 'recap'], method: 'setWeekRecap', hook: 'week-recap', on: (i) => i.weekRecap,
+      said: (on) => (on ? 'Done. Your first note comes after this week is over.' : 'No more weekly notes.') }),
+
+    { id: 'parent-lock', group: 'lock', kind: 'block', app: true, label: 'Parent lock', hint: 'With a PIN set, switching off any of Sentinel\'s protection, here or in the tray, or quitting Sentinel, needs the PIN. So do putting a quarantined file back, telling the tech-support scam shield that you use a remote-control program yourself, and switching accounts. Turning protection on never does. It does not cover the browser companion or Windows administrator accounts.',
+      words: ['pin', 'child', 'children', 'kids', 'family', 'lock', 'code'], why: (i) => appWhy(i, 'lockStatus'), mount: (body) => renderParentLock(body) },
+
+    { id: 'profile', group: 'account', kind: 'block', label: 'Profile', hint: 'Your name as Sentinel shows it. Your email is how you sign in.', words: ['name', 'email', 'first name'], mount: profileBlock },
+    { id: 'two-factor', group: 'account', kind: 'block', label: 'Two-factor sign-in', hint: 'A code from an authenticator app at every sign-in, as well as your password.', words: ['2fa', 'authenticator', 'code', 'otp', 'two step', 'security'],
+      mount: (body) => { body.setAttribute('data-2fa', ''); render2fa(body); } },
+    { id: 'password', group: 'account', kind: 'block', label: 'Change password', hint: 'You will be signed out everywhere else.', words: ['password', 'security'],
+      why: () => (state.me.user.hasPassword ? '' : 'You sign in with Google, so there is no Sentinel password to change.'), mount: passwordBlock },
+    { id: 'devices', group: 'account', kind: 'block', label: 'Signed-in devices', hint: 'Every browser, Sentinel app and companion signed in to your account.', words: ['sessions', 'sign out', 'logout', 'devices', 'computers'],
+      mount: (body) => { body.setAttribute('data-sessions', ''); loadSessions(body); } },
+
+    // Your data: what the Privacy Policy says an account holds, how to take it and how to remove it.
+    { id: 'download-data', group: 'data', kind: 'block', label: 'Download my data', hint: 'One file with everything your account holds, item by item as the Privacy Policy lists it. Your password, sign-in links, two-factor secret and AI keys are never in it.',
+      words: ['export', 'copy', 'gdpr', 'ccpa', 'privacy', 'download', 'json'], mount: downloadBlock },
+    { id: 'history-data', group: 'data', kind: 'custom', label: 'Scan history', hint: 'Kept for 90 days. Delete one entry or all of it on the History page.', words: ['history', 'erase', 'clear', 'scans'],
+      control: () => linkControl('/app/history') },
+    { id: 'live-memory', group: 'data', kind: 'block', label: 'What live scanning remembers', hint: 'Exposure alerts keep a scrambled code for each safe site you visited, for 14 days. Your sites keeps the sites you added and the ones it learned. Either can be erased here at once.',
+      words: ['exposure', 'my sites', 'your sites', 'forget', 'erase', 'remembered'], mount: forgetBlock },
+    { id: 'delete-account', group: 'data', kind: 'block', label: 'Delete account', hint: 'Permanently removes your account, history, reports and trusted sites.', words: ['remove', 'erase', 'close account', 'data'], mount: deleteBlock },
+
+    { id: 'plan-usage', group: 'plan', kind: 'custom', label: 'Plan and usage', hint: 'What is left this week, and the plans to choose from.', words: ['billing', 'pro', 'max', 'ultimate', 'upgrade', 'subscription', 'limits'],
+      state: () => `You are on ${plan().name}.`, control: () => linkControl('/app/plan') },
+    { id: 'assistants', group: 'plan', kind: 'custom', label: 'AI assistants', hint: 'Optional. Ask ChatGPT, Claude, Gemini or DeepSeek about anything. Sentinel\'s scans never depend on them.', words: ['chatgpt', 'claude', 'gemini', 'deepseek', 'ai', 'connect'],
+      control: () => linkControl('/app/assistants') },
+    { id: 'updates', group: 'plan', kind: 'custom', app: true, label: 'Updates', hint: 'The Sentinel app installs its own updates. The website is always the newest version.', words: ['version', 'update', 'upgrade', 'new'],
+      why: (i) => (desktop ? appWhy(i, 'checkUpdates') : ''),
+      state: (i) => (i ? `Sentinel ${i.version}. ${updateText(i.update || { status: 'idle' })}` : 'This website is always the newest Sentinel.'),
+      control: (i) => { const up = (i && i.update) || {}; return up.status === 'ready' ? '<button class="btn btn--sm btn--gold" type="button" data-install-update>Restart now</button>' : up.supported ? '<button class="btn btn--sm" type="button" data-check-update>Check now</button>' : ''; },
+      bind: (row, info, ctx) => {
+        const check = $('[data-check-update]', row);
+        if (check) check.addEventListener('click', () => busy(check, 'Checking', async () => {
+          let s;
+          try { s = await desktop.checkUpdates(); } catch (err) { toast(desktopError(err), 'error'); return; }
+          toast(s.status === 'current' ? 'Sentinel is up to date.' : s.status === 'error' ? 'Could not check for updates. Try again later.' : 'Checking for a newer version.', s.status === 'error' ? 'error' : 'info');
+          ctx.refresh();
+        }));
+        const install = $('[data-install-update]', row);
+        if (install) install.addEventListener('click', () => desktop.installUpdate());
+      } },
+
+    { id: 'whats-new', group: 'help', kind: 'block', label: 'What changed', hint: 'The notes for the newest version of Sentinel.', words: ['changelog', 'release notes', 'new', 'version', 'about'], mount: whatsNewBlock },
+    { id: 'false-alarm', group: 'help', kind: 'block', label: 'Report a false alarm', hint: 'Sentinel warned you about a site you know is safe. Tell us which one.', words: ['wrong', 'mistake', 'safe', 'false positive', 'report', 'feedback'], mount: falseAlarmBlock },
+    { id: 'support', group: 'help', kind: 'custom', label: 'Write to us', hint: 'A question, a problem, or a scam Sentinel missed.', words: ['help', 'contact', 'support', 'email', 'privacy', 'terms'],
+      body: () => '<p class="set-sub">How Sentinel treats your data, and the rules for using it: <a href="/privacy">Privacy Policy</a> &middot; <a href="/terms">Terms</a></p>',
+      control: () => (state.config.supportEmail ? `<a class="btn btn--sm" href="mailto:${esc(state.config.supportEmail)}">Email support</a>` : '') }
+  ];
+  const settingWords = (r) => `${r.label} ${r.hint} ${(r.words || []).join(' ')} ${SETTING_GROUPS.find(([g]) => g === r.group)[1]}`.toLowerCase();
+  const settingMatches = (r, q) => q.toLowerCase().split(/\s+/).filter(Boolean).every((w) => settingWords(r).includes(w));
+
+  function profileBlock(body) {
     const u = state.me.user;
-    el.innerHTML = `
-      ${title('Security', 'Protect your Sentinel account the way Sentinel protects you.')}
-      <div class="grid2">
-        <form class="panel" data-name-form data-draft="profile">
-          <h2 class="u-mb">Profile</h2>
-          <div class="row2">
-            <div class="field"><label for="p-first">First name</label><input class="input" id="p-first" name="firstName" value="${esc(u.firstName)}" required maxlength="60"></div>
-            <div class="field"><label for="p-last">Last name <span class="opt">(optional)</span></label><input class="input" id="p-last" name="lastName" value="${esc(u.lastName || '')}" maxlength="60"></div>
-          </div>
-          <div class="field"><label for="p-email">Email ${u.emailVerified ? '<span class="status is-on u-ml">Confirmed</span>' : '<span class="status is-locked u-ml">Not confirmed</span>'}</label><input class="input" id="p-email" value="${esc(u.email)}" disabled></div>
-          <button class="btn u-mt" type="submit">Save profile</button>
-        </form>
-
-        <div class="panel" data-2fa></div>
-      </div>
-
-      ${u.hasPassword ? `<form class="panel" data-pw-form>
-        <h2 class="u-mb">Change password</h2>
+    body.innerHTML = `<form data-name-form data-draft="profile">
         <div class="row2">
-          <div class="field"><label for="pw-cur">Current password</label><input class="input" id="pw-cur" type="password" name="currentPassword" autocomplete="current-password" required></div>
-          <div class="field"><label for="pw-new">New password</label><input class="input" id="pw-new" type="password" name="newPassword" autocomplete="new-password" required minlength="10"><span class="field__hint">10+ characters with a letter and a number. You will be signed out everywhere else.</span></div>
+          <div class="field"><label for="p-first">First name</label><input class="input" id="p-first" name="firstName" value="${esc(u.firstName)}" required maxlength="60"></div>
+          <div class="field"><label for="p-last">Last name <span class="opt">(optional)</span></label><input class="input" id="p-last" name="lastName" value="${esc(u.lastName || '')}" maxlength="60"></div>
         </div>
-        <button class="btn u-mt" type="submit">Update password</button>
-      </form>` : ''}
-
-      <div class="panel" data-sessions><div class="skeleton u-h-md" ></div></div>
-
-      <form class="panel panel--danger" data-delete>
-        <h2>Delete account</h2>
-        <p class="panel-lede">Permanently removes your account, history, reports and trusted sites.</p>
-        <div class="row2">
-          ${u.hasPassword ? '<div class="field"><label for="del-pw">Password</label><input class="input" id="del-pw" type="password" name="password" autocomplete="current-password"></div>' : ''}
-          <div class="field"><label for="del-confirm">Type DELETE to confirm</label><input class="input" id="del-confirm" name="confirm" autocomplete="off"></div>
-        </div>
-        <button class="btn btn--danger u-mt" type="submit">Delete my account</button>
+        <div class="field"><label for="p-email">Email ${u.emailVerified ? '<span class="status is-on u-ml">Confirmed</span>' : '<span class="status is-locked u-ml">Not confirmed</span>'}</label><input class="input" id="p-email" value="${esc(u.email)}" disabled></div>
+        <button class="btn u-mt" type="submit">Save profile</button>
       </form>`;
-
-    $('[data-name-form]', el).addEventListener('submit', async (ev) => {
+    $('form', body).addEventListener('submit', async (ev) => {
       ev.preventDefault();
       const f = ev.target;
       await busy($('button', f), 'Saving', async () => {
@@ -3204,21 +3210,138 @@
         } catch (err) { toast(err.message, 'error'); }
       });
     });
+  }
 
-    const pw = $('[data-pw-form]', el);
-    if (pw) pw.addEventListener('submit', async (ev) => {
+  function passwordBlock(body) {
+    body.innerHTML = `<form data-pw-form>
+        <div class="row2">
+          <div class="field"><label for="pw-cur">Current password</label><input class="input" id="pw-cur" type="password" name="currentPassword" autocomplete="current-password" required></div>
+          <div class="field"><label for="pw-new">New password</label><input class="input" id="pw-new" type="password" name="newPassword" autocomplete="new-password" required minlength="10"><span class="field__hint">10+ characters with a letter and a number.</span></div>
+        </div>
+        <button class="btn u-mt" type="submit">Update password</button>
+      </form>`;
+    const pw = $('form', body);
+    pw.addEventListener('submit', async (ev) => {
       ev.preventDefault();
       await busy($('button', pw), 'Updating', async () => {
         try {
           await api('/account/password', { method: 'POST', body: { currentPassword: pw.currentPassword.value, newPassword: pw.newPassword.value } });
           pw.reset();
           toast('Password updated. Other sessions were signed out.', 'success');
-          loadSessions();
+          const devices = $('[data-sessions]');
+          if (devices) loadSessions(devices);
         } catch (err) { toast(err.message, 'error'); }
       });
     });
+  }
 
-    $('[data-delete]', el).addEventListener('submit', async (ev) => {
+  // The file comes from the server, which lists each thing the Privacy Policy says an account holds (a test keeps
+  // the two in step). It asks for the password again: a borrowed session must not be able to take it.
+  function downloadBlock(body) {
+    const u = state.me.user;
+    body.innerHTML = `<form data-export>
+        ${u.hasPassword ? '<div class="row2"><div class="field"><label for="ex-pw">Password</label><input class="input" id="ex-pw" type="password" name="password" autocomplete="current-password" required></div></div>' : ''}
+        <button class="btn${u.hasPassword ? ' u-mt' : ''}" type="submit">Download my data</button>
+      </form>`;
+    $('form', body).addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      const f = ev.target;
+      await busy($('button', f), 'Preparing', async () => {
+        try {
+          const data = await api('/account/export', { method: 'POST', body: { password: f.password ? f.password.value : '' } });
+          const name = `sentinel-data-${data.exportedAt.slice(0, 10)}.json`;
+          const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
+          const a = Object.assign(document.createElement('a'), { href: url, download: name });
+          document.body.append(a);
+          a.click();
+          a.remove();
+          setTimeout(() => URL.revokeObjectURL(url), 60000);
+          f.reset();
+          toast(`Your data is ready as ${name}.`, 'success');
+        } catch (err) { toast(err.message, 'error'); }
+      });
+    });
+  }
+
+  // Erasing what live scanning keeps. A second press within a few seconds erases, so one stray click never does.
+  function forgetBlock(body, ctx) {
+    const WHAT = {
+      exposures: ['Forget visited sites', '/live/exposures/forget', (n) => (n ? `Forgot ${n} visited site${n === 1 ? '' : 's'}, and every alert found for them.` : 'Nothing was remembered. Every alert is cleared.')],
+      'my-sites': ['Forget Your sites', '/my-sites/forget', (n) => (n ? `Forgot ${n} of Your sites.` : 'Your sites held nothing to forget.')]
+    };
+    body.innerHTML = `<div class="set-sub set-sub--start">${Object.entries(WHAT).map(([k, [label]]) => `<button class="btn btn--sm" type="button" data-forget="${k}">${label}</button>`).join('')}</div>`;
+    $$('[data-forget]', body).forEach((b) => {
+      const [label, path, said] = WHAT[b.dataset.forget];
+      let armed = 0;
+      b.addEventListener('click', () => {
+        if (!armed) {
+          b.textContent = 'Press again to erase';
+          armed = setTimeout(() => { armed = 0; b.textContent = label; }, 4000);
+          return;
+        }
+        clearTimeout(armed);
+        armed = 0;
+        busy(b, 'Erasing', async () => {
+          try {
+            const r = await api(path, { method: 'POST', body: {} });
+            toast(said(r.forgotten), 'success');
+            ctx.refresh();
+          } catch (err) { toast(err.message, 'error'); }
+        }).then(() => { b.textContent = label; });
+      });
+    });
+  }
+
+  // The newest version's notes, from web/assets/release-note.json, which npm run build:note writes from
+  // changelog/<version>.md beside the download page's note.
+  async function whatsNewBlock(body) {
+    body.innerHTML = '<div class="skeleton u-h-md"></div>';
+    try {
+      const res = await fetch('/assets/release-note.json', { credentials: 'same-origin' });
+      const note = res.ok ? await res.json() : null;
+      if (!note || !note.version || !Array.isArray(note.groups)) throw new Error('no note');
+      body.innerHTML = `<div class="set-note"><p><b>New in Sentinel ${esc(note.version)} ${esc(note.model || '')}.</b> ${esc(note.summary)}.</p>
+        <details class="set-facts"><summary>Every change in this version</summary>${note.groups.map((g) => `<h3>${esc(g.title)}</h3><ul>${g.items.map((i) => `<li>${esc(i)}</li>`).join('')}</ul>`).join('')}</details></div>`;
+    } catch {
+      body.innerHTML = '<p class="set-sub">The notes could not be loaded just now. They are also on the <a href="/download">download page</a>.</p>';
+    }
+  }
+
+  // A false alarm is kept with the site for Sentinel to learn from. It never counts against the site, and on its own
+  // it changes nobody's result: trusting the site is what stops the warning, for this account.
+  function falseAlarmBlock(body) {
+    body.innerHTML = `<form data-false-alarm data-draft="false-alarm">
+        <div class="row2">
+          <div class="field"><label for="fa-site">The site</label><input class="input" id="fa-site" name="url" required maxlength="2048" placeholder="mybakery.com" autocomplete="off" spellcheck="false"></div>
+          <div class="field"><label for="fa-note">What it is <span class="opt">(optional)</span></label><input class="input" id="fa-note" name="note" maxlength="500" placeholder="My local bakery"></div>
+        </div>
+        <label class="consent__row u-mt"><input type="checkbox" name="trust"><span>Also trust this site for me, so its warning stops now</span></label>
+        <button class="btn u-mt" type="submit">Send</button>
+      </form>`;
+    $('form', body).addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      const f = ev.target;
+      await busy($('button[type=submit]', f), 'Sending', async () => {
+        try {
+          const r = await api('/report', { method: 'POST', body: { url: f.url.value, category: 'false_alarm', note: f.note.value } });
+          if (f.trust.checked) await api('/sites/override', { method: 'POST', body: { url: f.url.value, action: 'allow' } });
+          toast(f.trust.checked ? `Sent, and ${r.host} is trusted for you now.` : 'Sent, thank you. On its own a report changes no one’s result.', 'success');
+          f.reset();
+        } catch (err) { toast(err.message, 'error'); }
+      });
+    });
+  }
+
+  function deleteBlock(body) {
+    const u = state.me.user;
+    body.innerHTML = `<form data-delete>
+        <div class="row2">
+          ${u.hasPassword ? '<div class="field"><label for="del-pw">Password</label><input class="input" id="del-pw" type="password" name="password" autocomplete="current-password"></div>' : ''}
+          <div class="field"><label for="del-confirm">Type DELETE to confirm</label><input class="input" id="del-confirm" name="confirm" autocomplete="off"></div>
+        </div>
+        <button class="btn btn--danger u-mt" type="submit">Delete my account</button>
+      </form>`;
+    $('form', body).addEventListener('submit', async (ev) => {
       ev.preventDefault();
       const f = ev.target;
       await busy($('button', f), 'Deleting', async () => {
@@ -3228,46 +3351,214 @@
         } catch (err) { toast(err.message, 'error'); }
       });
     });
-
-    render2fa($('[data-2fa]', el));
-
-    async function loadSessions() {
-      const slot = $('[data-sessions]', el);
-      try {
-        const { sessions } = await api('/account/sessions');
-        slot.innerHTML = `<div class="panel__head"><div><h2>Signed-in devices</h2><p>${sessions.length} active session${sessions.length === 1 ? '' : 's'}</p></div>${sessions.length > 1 ? '<button class="btn btn--sm" data-revoke>Sign out other devices</button>' : ''}</div>
-          <ul class="list">${sessions.map((s) => `<li>
-            <span class="list__icon">${s.kind === 'web' ? ICON.link : s.kind === 'desktop' ? ICON.download : ICON.shield}</span>
-            <span class="list__main"><b>${esc(s.device)}${s.current ? ' <span class="status is-on u-ml">This device</span>' : ''}</b><span>${esc(s.kind === 'web' ? 'Browser' : s.kind === 'desktop' ? 'Sentinel app' : 'Browser companion')} &middot; ${s.ip ? esc(s.ip) + ' &middot; ' : ''}active ${ago(s.lastSeenAt || s.createdAt)} &middot; ${s.kind === 'web' ? (s.staySignedIn ? 'stays signed in, ends after 30 days unused' : 'ends when the browser closes') : 'ends after 90 days unused'}</span></span>
-            ${s.current ? '<button class="btn btn--sm" data-signout-here>Sign out</button>' : `<button class="btn btn--sm" data-revoke-one="${esc(s.id)}">Sign out</button>`}
-          </li>`).join('')}</ul>`;
-        $$('[data-revoke-one]', slot).forEach((b) => b.addEventListener('click', () => busy(b, 'Signing out', async () => {
-          try {
-            await api('/account/sessions/revoke', { method: 'POST', body: { id: b.dataset.revokeOne } });
-            toast('That device was signed out. The others were not touched.', 'success');
-          } catch (err) { toast(err.message, 'error'); }
-          loadSessions();
-        })));
-        // This device: the same as the account button, here too because a phone has no side bar.
-        const here = $('[data-signout-here]', slot);
-        if (here) here.addEventListener('click', () => busy(here, 'Signing out', () => signOut()));
-        const revoke = $('[data-revoke]', slot);
-        if (revoke) revoke.addEventListener('click', () => busy(revoke, 'Signing out', async () => {
-          try {
-            await api('/account/sessions/revoke-others', { method: 'POST', body: {} });
-            toast('Other devices were signed out.', 'success');
-            loadSessions();
-          } catch (err) { toast(err.message, 'error'); }
-        }));
-      } catch (err) { slot.innerHTML = `<div class="banner banner--error">${esc(err.message)}</div>`; }
-    }
-    loadSessions();
   }
+
+  async function loadSessions(slot) {
+    if (!slot.innerHTML) slot.innerHTML = skel('devices');
+    try {
+      const { sessions } = await api('/account/sessions');
+      slot.innerHTML = `<div class="set-sub"><span class="muted">${sessions.length} active session${sessions.length === 1 ? '' : 's'}</span>${sessions.length > 1 ? '<button class="btn btn--sm" type="button" data-revoke>Sign out other devices</button>' : ''}</div>
+        <ul class="list">${sessions.map((s) => `<li>
+          <span class="list__icon">${s.kind === 'web' ? ICON.link : s.kind === 'desktop' ? ICON.download : ICON.shield}</span>
+          <span class="list__main"><b>${esc(s.device)}${s.current ? ' <span class="status is-on u-ml">This device</span>' : ''}</b><span>${esc(s.kind === 'web' ? 'Browser' : s.kind === 'desktop' ? 'Sentinel app' : 'Browser companion')} &middot; ${s.ip ? esc(s.ip) + ' &middot; ' : ''}active ${ago(s.lastSeenAt || s.createdAt)} &middot; ${s.kind === 'web' ? (s.staySignedIn ? 'stays signed in, ends after 30 days unused' : 'ends when the browser closes') : 'ends after 90 days unused'}</span></span>
+          ${s.current ? '<button class="btn btn--sm" type="button" data-signout-here>Sign out</button>' : `<button class="btn btn--sm" type="button" data-revoke-one="${esc(s.id)}">Sign out</button>`}
+        </li>`).join('')}</ul>`;
+      $$('[data-revoke-one]', slot).forEach((b) => b.addEventListener('click', () => busy(b, 'Signing out', async () => {
+        try {
+          await api('/account/sessions/revoke', { method: 'POST', body: { id: b.dataset.revokeOne } });
+          toast('That device was signed out. The others were not touched.', 'success');
+        } catch (err) { toast(err.message, 'error'); }
+        loadSessions(slot);
+      })));
+      keep(slot, 'devices');
+      // This device: the same as the account button, here too because a phone has no side bar.
+      const here = $('[data-signout-here]', slot);
+      if (here) here.addEventListener('click', () => busy(here, 'Signing out', () => signOut()));
+      const revoke = $('[data-revoke]', slot);
+      if (revoke) revoke.addEventListener('click', () => busy(revoke, 'Signing out', async () => {
+        try {
+          await api('/account/sessions/revoke-others', { method: 'POST', body: {} });
+          toast('Other devices were signed out.', 'success');
+          loadSessions(slot);
+        } catch (err) { toast(err.message, 'error'); }
+      }));
+    } catch (err) { failed(slot, err, () => { slot.innerHTML = ''; loadSessions(slot); }, { small: true, what: 'Your signed-in devices' }); }
+  }
+
+  /** Saves one switch row. The app's answer (active or enabled) is believed over the switch; a failure puts it back. */
+  async function saveSwitch(r, row, input, ctx) {
+    const wanted = input.checked;
+    input.disabled = true;
+    try {
+      const res = await (r.save ? r.save(input, row) : desktop[r.method](wanted));
+      const now = res && typeof res.active === 'boolean' ? res.active : res && typeof res.enabled === 'boolean' ? res.enabled : wanted;
+      input.checked = now;
+      if (r.saved) r.saved(now, res);
+      toast(r.said(now, res), now === wanted ? 'success' : 'info');
+    } catch (err) { input.checked = !wanted; toast(desktopError(err), 'error'); }
+    input.disabled = false;
+    ctx.refresh();
+  }
+
+  /** One row's frame: its name, hint, state line, control and body. Settings draws every row; the first-run step a few. */
+  function rowHTML(r) {
+    const label = r.kind === 'switch' ? `<label class="set-row__label" id="set-${r.id}-l" for="set-${r.id}-c">${esc(r.label)}</label>` : `<h3 class="set-row__label" id="set-${r.id}-l">${esc(r.label)}</h3>`;
+    return `<div class="set-row" id="${r.id}" data-set-row="${r.id}"><div class="set-fold">
+      <div class="set-row__head"><div class="set-row__text">${label}<p class="set-row__hint" id="set-${r.id}-hint">${esc(r.hint)}</p><p class="set-row__state" data-set-state${r.seen ? ` data-${r.seen} role="status"` : ""}></p></div>
+        <div class="set-row__control" data-set-control>${r.app && desktop ? '<span class="skeleton set-skel" aria-hidden="true"></span>' : ''}</div></div>
+      <div class="set-row__body" data-set-body></div></div></div>`;
+  }
+
+  /* A row's control, state line and body, redrawn only when what they say changes, so focus stays put. */
+  function paintRow(r, row, ctx) {
+    const info = ctx.info;
+    const why = r.why ? r.why(info) : '';
+    const stateHTML = why ? `<span class="set-why">${esc(why)}</span>` : r.state ? esc(r.state(info) || '') : '';
+    if (r.kind === 'block') {
+      $('[data-set-state]', row).innerHTML = stateHTML;
+      $('[data-set-control]', row).innerHTML = '';
+      if (!why && !row._mounted) { row._mounted = true; r.mount($('[data-set-body]', row), ctx); }
+      return;
+    }
+    const control = r.kind === 'switch'
+      ? `<input class="switch" type="checkbox" id="set-${r.id}-c"${r.hook ? ` data-${r.hook}` : ""} aria-describedby="set-${r.id}-hint" ${!why && r.on(info) ? 'checked' : ''} ${why ? 'disabled' : ''}>`
+      : why ? '' : r.control(info);
+    const body = why || !r.body ? '' : r.body(info, ctx.data);
+    const key = `${control}|${stateHTML}|${body}`;
+    if (row._key === key) return;
+    row._key = key;
+    const focused = row.contains(document.activeElement) ? document.activeElement : null;
+    const again = focused && (focused.id ? `#${focused.id}` : focused.dataset.seg ? `[data-seg="${focused.dataset.seg}"]` : null);
+    $('[data-set-control]', row).innerHTML = control;
+    const line = $('[data-set-state]', row);
+    line.innerHTML = stateHTML;
+    line.classList.toggle('is-down', Boolean(!why && r.down && r.down(info)));
+    $('[data-set-body]', row).innerHTML = body;
+    if (!why) {
+      const input = r.kind === 'switch' ? $('.switch', row) : null;
+      if (input) input.addEventListener('change', () => saveSwitch(r, row, input, ctx));
+      if (r.bind) r.bind(row, info, ctx);
+    }
+    if (focused) { const back = (again && $(again, row)) || $('button, input, select, a', row); if (back) back.focus({ preventScroll: true }); }
+  }
+
+  function settingsView(el) {
+    el.innerHTML = `${title('Settings', 'Every choice Sentinel offers, in one place. A change is saved the moment you make it.')}
+      <div class="set" data-desktop>
+        <nav class="set-rail" aria-label="Settings groups">${SETTING_GROUPS.map(([g, name], i) => `<a href="#${g}" data-set-go="${g}"${i ? '' : ' aria-current="true"'}>${name}</a>`).join('')}</nav>
+        <div class="set-main">
+          <div class="set-find">${ICON.search}<input class="input" type="search" placeholder="Find a setting" aria-label="Find a setting" aria-describedby="set-count" autocomplete="off" spellcheck="false" data-set-find></div>
+          <p class="sr-only" id="set-count" role="status" data-set-count></p>
+          ${desktop ? '' : `<div class="set-app"><p><b>Most of these work through the Sentinel app for Windows.</b> Here they say so instead of switching. Your account, plan and look work everywhere.</p><a class="btn btn--gold btn--sm" href="/download">${ICON.download}Download Sentinel</a></div>`}
+          ${SETTING_GROUPS.map(([g, name]) => `<section class="set-group" id="${g}" data-set-group="${g}" aria-labelledby="set-g-${g}"><div class="set-fold">
+            <h2 class="set-group__title" id="set-g-${g}">${name}</h2>${SETTINGS.filter((r) => r.group === g).map(rowHTML).join('')}</div></section>`).join('')}
+          <div class="set-none" data-set-none hidden><p>Nothing matches.</p><button class="btn btn--sm" type="button" data-set-clear>Clear search</button></div>
+        </div>
+      </div>`;
+    const box = $('[data-desktop]', el);
+    box._off = [];
+    const ctx = { info: null, ready: !desktop, data: { mine: [] }, offs: box._off, draw, refresh };
+    const rowOf = (id) => $(`[data-set-row="${id}"]`, el);
+
+    function draw() {
+      if (!el.isConnected) return;
+      for (const r of SETTINGS) if (!r.app || ctx.ready) paintRow(r, rowOf(r.id), ctx);
+    }
+    async function refresh() {
+      if (!desktop) return draw();
+      let info = null;
+      try { info = await desktop.info(); state.desktopInfo = info; } catch { /* each row says the app did not answer */ }
+      try { if (info && desktop.mySites) ctx.data.mine = await desktop.mySites(); } catch { /* none */ }
+      ctx.info = info;
+      ctx.ready = true;
+      draw();
+    }
+
+    /* Search: rows that do not match fold away (a height spring, no fade) and leave the tab order. */
+    const find = $('[data-set-find]', el);
+    const none = $('[data-set-none]', el);
+    const count = $('[data-set-count]', el);
+    function filter() {
+      const q = find.value.trim();
+      let shown = 0;
+      for (const r of SETTINGS) {
+        const ok = !q || settingMatches(r, q);
+        const row = rowOf(r.id);
+        row.classList.toggle('is-out', !ok);
+        row.inert = !ok;
+        if (ok) shown += 1;
+      }
+      for (const [g] of SETTING_GROUPS) {
+        const any = SETTINGS.some((r) => r.group === g && (!q || settingMatches(r, q)));
+        const group = $(`[data-set-group="${g}"]`, el);
+        group.classList.toggle('is-out', !any);
+        group.inert = !any;
+      }
+      none.hidden = shown > 0;
+      count.textContent = !q ? '' : shown ? `${shown} setting${shown === 1 ? '' : 's'} shown` : 'Nothing matches.';
+    }
+    function goTo(id, found) {
+      const target = id && (SETTINGS.some((r) => r.id === id) || SETTING_GROUPS.some(([g]) => g === id)) ? $(`#${id}`, el) : null;
+      if (!target) return;   // an unknown or old address: the page as it is
+      target.scrollIntoView({ block: 'start', behavior: glide() });
+      if (!found || !target.matches('.set-row')) return;
+      target.classList.remove('is-found');
+      void target.offsetWidth;
+      target.classList.add('is-found');
+      clearTimeout(target._found);
+      target._found = setTimeout(() => target.classList.remove('is-found'), 2600);
+    }
+    find.addEventListener('input', filter);
+    find.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Escape' && find.value) { ev.preventDefault(); find.value = ''; filter(); }
+      if (ev.key !== 'Enter') return;
+      ev.preventDefault();
+      const first = SETTINGS.find((r) => settingMatches(r, find.value.trim()));
+      if (first) goTo(first.id, true);
+    });
+    $('[data-set-clear]', el).addEventListener('click', () => { find.value = ''; filter(); find.focus(); });
+
+    /* The group list: a link per group, the one in view marked. Jumping does not add a history entry per click. */
+    const rail = $('.set-rail', el);
+    rail.addEventListener('click', (ev) => {
+      const a = ev.target.closest('[data-set-go]');
+      if (!a) return;
+      ev.preventDefault();
+      history.replaceState(history.state, '', `#${a.dataset.setGo}`);
+      goTo(a.dataset.setGo);
+    });
+    if ('IntersectionObserver' in window) {
+      const io = new IntersectionObserver((entries) => {
+        for (const e of entries) if (e.isIntersecting) $$('[data-set-go]', rail).forEach((a) => (a.dataset.setGo === e.target.id ? a.setAttribute('aria-current', 'true') : a.removeAttribute('aria-current')));
+      }, { rootMargin: '-15% 0px -75% 0px' });
+      $$('[data-set-group]', el).forEach((g) => io.observe(g));
+      box._off.push(() => io.disconnect());
+    }
+
+    /* The app says when something changed (the tray menu, another window, a parent lock): the rows follow. */
+    if (desktop) {
+      for (const [name, key] of [['onChatSafety', 'chatSafety'], ['onTextSafety', 'textSafety'], ['onLive', 'live'], ['onCommand', 'commandHeld']]) {
+        if (!desktop[name]) continue;
+        const off = desktop[name]((v) => { if (ctx.info && v !== undefined) { ctx.info[key] = v; draw(); } });
+        if (typeof off === 'function') box._off.push(off);
+      }
+      for (const name of ['onSettings', 'onUpdate', 'onDefense']) {
+        if (!desktop[name]) continue;
+        const off = desktop[name](() => refresh());
+        if (typeof off === 'function') box._off.push(off);
+      }
+    }
+    draw();
+    // After the rows have their real size, so the row asked for lands where it should.
+    const arrived = location.hash.slice(1);
+    const settle = () => requestAnimationFrame(() => goTo(arrived, true));
+    if (desktop) refresh().then(settle); else settle();
+  }
+
 
   function render2fa(slot) {
     const on = state.me.user.twoFactorEnabled;
-    slot.innerHTML = `<h2>Two-factor authentication</h2>
-      <p class="panel-lede">${on ? 'On. Signing in needs a code from your authenticator app.' : 'Add a second step to sign-in with Google Authenticator, 1Password, Authy or any authenticator app.'}</p>
+    slot.innerHTML = `<p class="panel-lede">${on ? 'On. Signing in needs a code from your authenticator app.' : 'Add a second step to sign-in with Google Authenticator, 1Password, Authy or any authenticator app.'}</p>
       <div data-2fa-body>${on
         ? '<form data-disable><div class="field"><label for="tfa-off">Enter a current code to turn it off</label><input class="input code-input" id="tfa-off" name="code" inputmode="numeric" maxlength="6" autocomplete="one-time-code" required></div>' + (state.me.user.hasPassword ? '<div class="field"><label for="tfa-off-pw">Your password</label><input class="input" id="tfa-off-pw" type="password" name="password" autocomplete="current-password" required></div>' : '') + '<button class="btn u-mt-sm" type="submit">Turn off two-factor</button></form>'
         : '<button class="btn btn--gold" data-setup>Set up two-factor</button>'}</div>`;
@@ -3320,9 +3611,9 @@
 
   async function assistantsView(el, params) {
     el.innerHTML = `${title('AI assistants', 'Optional. Ask ChatGPT, Claude, Gemini or DeepSeek about anything. Sentinel\'s scans never depend on them.')}
-      <div data-tabs><div class="skeleton skeleton--tabs"></div></div><div class="panel" data-pane id="ai-pane" role="tabpanel"><div class="skeleton u-h-lg"></div></div>`;
+      <div data-tabs><div class="skeleton skeleton--tabs"></div></div><div class="panel" data-pane id="ai-pane" role="tabpanel">${skel('assistants')}</div>`;
     let providers;
-    try { ({ providers } = await api('/ai/providers')); } catch (err) { $('[data-pane]', el).innerHTML = `<div class="banner banner--error">${esc(err.message)}</div>`; return; }
+    try { ({ providers } = await api('/ai/providers')); } catch (err) { $('[data-tabs]', el).innerHTML = ''; failed($('[data-pane]', el), err, () => assistantsView(el, params), { what: 'The assistants' }); return; }
     const active = providers.find((p) => p.id === params.get('ai')) || providers[0];
 
     $('[data-tabs]', el).innerHTML = `<div class="ai-tabs" role="tablist">${providers.map((p) => `
@@ -3336,6 +3627,7 @@
     pane.style.setProperty('--accent', active.accent);
     if (active.connected) renderChat(pane, active, el);
     else renderConnect(pane, active);
+    keep(pane, 'assistants');
   }
 
   function renderConnect(pane, p) {

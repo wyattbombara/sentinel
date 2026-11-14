@@ -23,7 +23,8 @@ body.app::before { opacity: .6; }
 .side__link {
   position: relative;
   display: flex; align-items: center; gap: 11px;
-  height: 38px; padding: 0 12px; border-radius: var(--r);
+  /* At a larger text size a long name ("Is this call a scam?") wraps: the row grows with it instead of crowding the next. */
+  min-height: 38px; padding: 5px 12px; border-radius: var(--r); line-height: 1.25;
   color: var(--text-2); font-size: var(--t-ui);
   transition: background .18s, color .18s;
 }
@@ -31,7 +32,6 @@ body.app::before { opacity: .6; }
 .side__link:hover { background: rgb(var(--ink) / .04); color: var(--text); }
 .side__link[aria-current="page"] { background: rgb(var(--gold-rgb) / .08); color: var(--gold-50); box-shadow: inset 0 0 0 1px rgb(var(--gold-rgb) / .16); }
 .side__link[aria-current="page"] svg { color: var(--gold-300); opacity: 1; }
-.side__link .pill { margin-left: auto; font: 500 var(--t-micro) var(--mono); padding: 2px 7px; border-radius: var(--r-sm); color: var(--gold-200); background: rgb(var(--gold-rgb) / .12); }
 .side__foot { margin-top: auto; display: grid; gap: 10px; }
 .side__foot .theme-toggle { margin-left: 0; justify-self: start; }
 .side__foot .legal-links { justify-content: flex-start; gap: 4px 12px; padding: 0 8px; font-size: var(--t-label); }
@@ -56,9 +56,11 @@ body.app::before { opacity: .6; }
   /* A phone's bar holds the four pages used most and More, which lists every page and Sign out (the Ctrl K search). */
   .side .logo, .side .model-badge, .side__label, .side__foot, .side__nav .side__link:not([data-phone]) { display: none; }
   .side__nav .side__more { display: flex; }
+  /* "Check something" is Check in the bar: one line, like its neighbours (its name stays in aria-label). */
+  .side__link[data-short] { font-size: 0; }
+  .side__link[data-short]::after { content: attr(data-short); font-size: var(--t-micro); }
   .side__nav { display: flex; width: 100%; justify-content: space-around; }
   .side__link { flex: 1 1 0; min-width: 0; min-height: 48px; justify-content: center; flex-direction: column; gap: 3px; height: auto; padding: 7px 4px; font-size: var(--t-micro); text-align: center; }
-  .side__link .pill { display: none; }
   .main { padding-bottom: 90px !important; }
   .topbar-mobile { display: flex !important; }
 }
@@ -76,7 +78,7 @@ body.app::before { opacity: .6; }
 .page-title p { margin-top: 8px; color: var(--text-2); max-width: 60ch; }
 .page-title b { color: var(--gold-200); font-weight: 500; }
 
-.panel { border-radius: var(--r-lg); background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); padding: 26px; }
+.panel { border-radius: var(--r-lg); background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); padding: calc(26px * var(--ds)); }
 .panel + .panel, .grid2 + .panel, .panel + .grid2 { margin-top: 18px; }
 .panel h2 { font-size: var(--t-title); }
 .panel__head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 18px; }
@@ -102,22 +104,95 @@ body.app::before { opacity: .6; }
 .scanbox .btn { --h: 44px; }
 .scan-meta { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 12px; font-size: var(--t-note); color: var(--muted); }
 .scan-meta a { color: var(--gold-300); }
-/* Fast or delicate, above the link box (delicate researches the site). */
-.scan-mode { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; margin: 14px 0 12px; font-size: var(--t-note); }
+
+/* ------------------------------------------------- check: one box for anything */
+
+/* The Check page (app.js checkView): one well to paste or drop into, a sentence saying what Sentinel saw and what it
+   will spend, and the kinds it could be, one press away. */
+.ask { display: grid; gap: 14px; }
+.ask__box {
+  position: relative; display: grid; border-radius: var(--r-lg);
+  /* The same edge as every other field (29841a1): a well you can see, empty or not. */
+  /* Lit from above in the site's gold, the way the hero's mask is: a well, not a form field. */
+  --well: .17; --well-edge: .36;
+  background: radial-gradient(120% 90% at 50% -30%, rgb(var(--gold-rgb) / var(--well)), transparent 62%), var(--field-bg);
+  caret-color: var(--gold-300); box-shadow: var(--press), inset 0 1px 0 rgb(var(--gold-rgb) / var(--well-edge)), inset 0 0 0 1px var(--field-ring);
+  transition: box-shadow .3s var(--ease);
+}
+/* On ivory the same light needs less: it would turn brassy. */
+@media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) .ask__box { --well: .08; --well-edge: .2; } }
+:root[data-theme="light"] .ask__box { --well: .08; --well-edge: .2; }
+.ask__box:focus-within, .ask__box.is-over { box-shadow: var(--press), inset 0 0 0 1px rgb(var(--gold-rgb) / .55), 0 0 0 4px rgb(var(--gold-rgb) / .08); }
+.ask__text {
+  display: block; width: 100%; min-height: calc(4 * 1.55em + 24px); max-height: 50vh; field-sizing: content; resize: none;
+  padding: 18px 20px 6px; border: 0; outline: none; background: none; color: var(--text);
+  font: var(--t-body) / 1.55 var(--sans); letter-spacing: var(--tr-text); overflow-wrap: anywhere;
+}
+.ask__text::placeholder { color: var(--faint); font: 400 var(--t-title-s) / 1.3 var(--display); letter-spacing: var(--tr-display); }
+.ask__file { display: flex; align-items: center; gap: 12px; min-height: calc(4 * 1.55em + 24px); padding: 18px 20px 6px; }
+.ask__file[hidden], .ask__text[hidden] { display: none; }
+.ask__file-icon { width: 40px; height: 40px; flex: none; display: grid; place-items: center; border-radius: var(--r); color: var(--gold-300); background: rgb(var(--gold-rgb) / .08); box-shadow: inset 0 0 0 1px var(--line-gold); }
+.ask__file-icon svg { width: 20px; height: 20px; }
+.ask__file-name { min-width: 0; font: 500 var(--t-text) var(--sans); color: var(--text); overflow-wrap: anywhere; }
+.ask__file-size { flex: none; font: var(--t-note) var(--mono); color: var(--muted); margin-right: auto; }
+.ask__bar { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; padding: 8px 8px 8px 10px; }
+.ask__add {
+  display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 12px; border: 0; border-radius: var(--r-sm);
+  background: none; color: var(--text-2); font: 500 var(--t-ui) var(--sans); cursor: pointer; transition: color .2s, background-color .2s;
+}
+.ask__add:hover, .ask__add[aria-expanded="true"] { color: var(--text); background-color: rgb(var(--ink) / .045); }
+.ask__add:focus-visible { outline: 2px solid var(--gold-300); outline-offset: 1px; }
+.ask__add svg { width: 17px; height: 17px; flex: none; color: var(--gold-300); }
+.ask__go { --h: 44px; margin-left: auto; min-width: 116px; }
+.ask__said { display: grid; gap: 12px; padding: 0 4px; }
+.ask__says { max-width: 70ch; font-size: var(--t-ui); line-height: 1.6; color: var(--text-2); }
+.ask__says:empty, .ask__try[hidden] { display: none; }
+/* The first thing anyone sees here: what the box takes, each one a press away from an example. */
+.ask__try { max-width: 64ch; font-size: var(--t-ui); line-height: 1.75; color: var(--muted); }
+.ask__try button {
+  padding: 0; border: 0; background: none; cursor: pointer; font: inherit; color: var(--gold-300);
+  text-decoration: underline; text-decoration-color: rgb(var(--gold-rgb) / .35); text-decoration-thickness: 1px; text-underline-offset: 4px;
+  transition: color .2s, text-decoration-color .2s;
+}
+.ask__try button:hover { color: var(--gold-200); text-decoration-color: currentColor; }
+.ask__try button:focus-visible { outline: 2px solid var(--gold-300); outline-offset: 2px; border-radius: 3px; }
+.ask__says b { font-weight: 600; color: var(--text); }
+.ask__as { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.ask__as[hidden], .ask__deeper[hidden] { display: none; }
+.ask__as-k { margin-right: 6px; font-size: var(--t-note); color: var(--muted); }
+.ask__kind {
+  height: 32px; padding: 0 13px; border: 0; border-radius: var(--r-sm); cursor: pointer;
+  background: none; color: var(--text-2); font: 500 var(--t-note) var(--sans); box-shadow: inset 0 0 0 1px var(--line-2);
+  transition: color .2s, box-shadow .2s, background-color .2s;
+}
+.ask__kind:hover { color: var(--text); box-shadow: inset 0 0 0 1px rgb(var(--gold-rgb) / .45); }
+.ask__kind[aria-pressed="true"] { color: var(--on-gold); background: var(--gold-grad); box-shadow: 0 1px 0 rgb(255 255 255 / .25) inset, 0 6px 16px -8px rgb(var(--gold-rgb) / .7); }
+.ask__kind:focus-visible, .ask__deeper:focus-visible { outline: 2px solid var(--gold-300); outline-offset: 2px; }
+/* Look deeper: a switch, its knob carried across on a spring. */
+.ask__deeper { justify-self: start; display: inline-flex; align-items: center; gap: 10px; min-height: 32px; padding: 0 2px; border: 0; border-radius: var(--r-sm); background: none; color: var(--text-2); font: 500 var(--t-note) var(--sans); cursor: pointer; }
+.ask__deeper:hover { color: var(--text); }
+.ask__deeper i { position: relative; width: 32px; height: 18px; flex: none; border-radius: 9px; box-shadow: inset 0 0 0 1px var(--line-2); transition: background-color .25s, box-shadow .25s; }
+.ask__deeper i::after { content: ''; position: absolute; top: 3px; left: 3px; width: 12px; height: 12px; border-radius: 50%; background: var(--muted); transition: transform .45s var(--spring), background-color .25s; }
+.ask__deeper[aria-pressed="true"] { color: var(--text); }
+.ask__deeper[aria-pressed="true"] i { background-color: rgb(var(--gold-rgb) / .18); box-shadow: inset 0 0 0 1px rgb(var(--gold-rgb) / .55); }
+.ask__deeper[aria-pressed="true"] i::after { transform: translateX(14px); background: var(--gold-300); }
+.ask__help { display: grid; gap: 4px; max-width: 70ch; font-size: var(--t-note); color: var(--muted); }
+.ask__help[hidden] { display: none; }
+.ask__help b { font-weight: 600; color: var(--text-2); }
+.ask__from { max-width: 420px; }
+.ask__call { margin: 18px 4px 0; font-size: var(--t-ui); color: var(--muted); }
+.ask__call a { color: var(--gold-300); text-decoration: underline; text-decoration-color: rgb(var(--gold-rgb) / .5); text-underline-offset: 3px; }
+.ask .shot { margin: 0; }
+@media (max-width: 560px) {
+  .ask__text, .ask__file { min-height: calc(3 * 1.55em + 20px); padding: 16px 16px 4px; }
+  .ask__go { flex-basis: 100%; margin: 6px 0 0; }
+}
+:root[data-motion="off"] { .ask__deeper i::after { transition: none; } }
 [data-out] { position: relative; }
-/* A QR code, read on this device: a row under the link box, and the camera's view when it is on. */
-.qr-in { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 14px; margin: 16px 0 4px; padding: 12px 14px; border-radius: var(--r-lg); box-shadow: inset 0 0 0 1px var(--line); transition: box-shadow .25s, background-color .25s; }
-.qr-in.is-over { box-shadow: inset 0 0 0 1px rgb(var(--gold-rgb) / .55), 0 0 0 4px rgb(var(--gold-rgb) / .07); background-color: rgb(var(--gold-rgb) / .03); }
-.qr-in__icon { width: 34px; height: 34px; flex: none; border-radius: var(--r); display: grid; place-items: center; color: var(--gold-300); background: rgb(var(--gold-rgb) / .08); box-shadow: inset 0 0 0 1px var(--line-gold); }
-.qr-in__icon svg { width: 18px; height: 18px; }
-.qr-in__text { flex: 1 1 260px; display: grid; gap: 2px; font-size: var(--t-note); color: var(--muted); }
-.qr-in__text b { color: var(--text); font-weight: 600; }
-.qr-in__btns { display: flex; gap: 8px; flex-wrap: wrap; }
-.qr-in__btns label { cursor: pointer; }
 .qr-cam { flex-basis: 100%; display: grid; gap: 8px; justify-items: start; }
 .qr-cam video { width: min(100%, 360px); aspect-ratio: 4 / 3; object-fit: cover; border-radius: var(--r); background: #000; box-shadow: var(--raise-sm); }
 .qr-cam p { font-size: var(--t-note); }
-[data-qr-out] .qr-card, [data-email-qr] .qr-card { margin: 14px 0; }
+[data-qr-out] .qr-card { margin: 14px 0; }
 
 .examples { display: flex; gap: 8px; flex-wrap: wrap; }
 .chip { height: 30px; padding: 0 11px; border-radius: var(--r-sm); border: 0; cursor: pointer; font: var(--t-note) var(--mono); color: var(--text-2); background: rgb(var(--ink) / .04); box-shadow: inset 0 0 0 1px var(--line); transition: color .2s, box-shadow .2s; }
@@ -142,7 +217,7 @@ body.app::before { opacity: .6; }
 .stages li.is-done { color: var(--muted); }
 .stages li.is-done i { box-shadow: none; background: var(--gold-400); }
 .stages li.is-skip { text-decoration: line-through; }
-@media (prefers-reduced-motion: reduce) { .stages { display: none; } .scanning__line i { transition: none; } }
+:root[data-motion="off"] { .stages { display: none; } .scanning__line i { transition: none; } }
 
 /* ------------------------------------------------------------- result */
 
@@ -165,15 +240,29 @@ body.app::before { opacity: .6; }
 .result__partly { margin-top: 8px !important; font-size: var(--t-ui) !important; line-height: 1.5; max-width: 62ch; }
 /* Everything else, on demand. The tiles and the rest keep their own padding, so the row lines up with them. */
 .result__more { border-top: 1px solid var(--line); }
-.result__more > summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 48px; padding: 12px 30px; font-size: var(--t-ui); color: var(--text-2); }
+.result__more > summary, .result__details { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 48px; padding: 12px 30px; font-size: var(--t-ui); color: var(--text-2); }
 .result__more > summary::-webkit-details-marker { display: none; }
-.result__more > summary:hover { color: var(--text); }
-.result__more > summary:focus-visible { outline: 2px solid var(--gold-300); outline-offset: -2px; }
-.result__more > summary i { width: 10px; height: 10px; flex: none; border-right: 1.5px solid var(--muted); border-bottom: 1.5px solid var(--muted); transform: rotate(45deg); }
-.result__more[open] > summary i { transform: rotate(225deg) translate(-2px, -1px); }
+.result__more > summary:hover, .result__details:hover { color: var(--text); }
+.result__more > summary:focus-visible, .result__details:focus-visible { outline: 2px solid var(--gold-300); outline-offset: -2px; }
+.result__more > summary i, .result__details i { width: 10px; height: 10px; flex: none; border-right: 1.5px solid var(--muted); border-bottom: 1.5px solid var(--muted); transform: rotate(45deg); }
+.result__more[open] > summary i, .result__details[aria-expanded="true"] i { transform: rotate(225deg) translate(-2px, -1px); }
 /* Everything that did not run, as one quiet line (ui.js notRunLine). */
 .result__notrun { margin: 0; padding: 12px 30px 16px; border-top: 1px solid var(--line); font-size: var(--t-note); line-height: 1.5; color: var(--muted); }
-@media (max-width: 560px) { .result__more > summary { padding: 12px 20px; } .result__notrun { padding: 12px 20px 14px; } }
+@media (max-width: 560px) { .result__more > summary, .result__details { padding: 12px 20px; } .result__notrun { padding: 12px 20px 14px; } }
+
+/* Simple view (boot.js; Settings, Appearance): fewer pages and fewer words. A result keeps its answer, what was not
+   checked, what to do and the way to the real site, in bigger words; Show details brings the clues, the checklist and
+   the actions back for that one result. Hidden parts are display: none, so a screen reader skips them too. */
+.result__details { display: none; width: 100%; border: 0; border-top: 1px solid var(--line); background: none; font-family: inherit; font-weight: 500; text-align: left; }
+html[data-simple] [data-full] { display: none !important; }
+html[data-simple] .result__details { display: flex; }
+html[data-simple] .result:not(.is-full) :is(.reasons, .result__more) { display: none; }
+html[data-simple] .result:not(.is-full) ~ .actions { display: none; }
+html[data-simple] .result__title h2 { font-size: var(--t-d3); overflow-wrap: anywhere; }
+html[data-simple] .result__lead { font-size: var(--t-lead) !important; }
+html[data-simple] .result__partly { font-size: var(--t-body) !important; }
+html[data-simple] .next-steps ol { gap: 12px; }
+html[data-simple] .next-steps li { font-size: var(--t-lead); }
 @media (max-width: 560px) { .result__head { flex-direction: column; align-items: flex-start; padding: 24px 20px 18px; } }
 
 /* The three threats as a stacked list, a row each: the mask, what was found, how strongly, and the score. */
@@ -222,7 +311,7 @@ body.app::before { opacity: .6; }
   .slow__step { grid-template-columns: 16px minmax(0, 1fr); justify-items: start; align-items: center; gap: 12px; text-align: left; }
   .slow__step::before { top: -12px; left: 7px; width: 2px; height: 12px; }
 }
-@media (prefers-reduced-motion: reduce) { .slow__step { animation: none; } }
+:root[data-motion="off"] { .slow__step { animation: none; } }
 
 /* The scanned email, each warning sign marked where it is (app.js showMarks). */
 .email-marks { padding: 22px 30px; border-bottom: 1px solid var(--line); }
@@ -249,7 +338,7 @@ body.app::before { opacity: .6; }
 .email-marks__why small + b { margin-top: 12px; }
 .email-marks__why p { font-size: var(--t-ui); color: var(--text-2); }
 .email-marks__why small { display: block; margin-top: 4px; font-size: var(--t-note); color: var(--muted); overflow-wrap: anywhere; }
-@media (prefers-reduced-motion: reduce) { .emark { transition: none; } .email-marks__why { animation: none; } }
+:root[data-motion="off"] { .emark { transition: none; } .email-marks__why { animation: none; } }
 /* Who really sent it, from the pasted headers (sender-xray): one plain line above the marked email. */
 .sender-proof { --c: var(--muted); display: flex; gap: 12px; align-items: baseline; padding: 18px 30px; border-bottom: 1px solid var(--line); box-shadow: inset 3px 0 0 var(--c); }
 @media (max-width: 560px) { .sender-proof { padding: 16px 20px; flex-direction: column; gap: 2px; } }
@@ -298,26 +387,8 @@ body.app::before { opacity: .6; }
 .check__body span { display: block; font-size: var(--t-note); color: var(--muted); margin-top: 2px; }
 .check__tag { font: var(--t-micro) var(--mono); color: var(--faint); padding-top: 3px; }
 
-/* ------------------------------------------------------------- upload */
-
-.drop {
-  position: relative; display: grid; place-items: center; text-align: center;
-  padding: 44px 24px; border-radius: var(--r-lg); cursor: pointer;
-  background: repeating-linear-gradient(135deg, rgb(var(--ink) / .012) 0 12px, transparent 12px 24px);
-  box-shadow: inset 0 0 0 1px var(--line-2);
-  transition: box-shadow .25s, background .25s;
-}
-.drop:hover, .drop.is-over { box-shadow: inset 0 0 0 1px rgb(var(--gold-rgb) / .55), 0 0 0 4px rgb(var(--gold-rgb) / .07); background-color: rgb(var(--gold-rgb) / .03); }
-.drop__icon { width: 54px; height: 54px; margin-inline: auto; border-radius: var(--r-lg); display: grid; place-items: center; color: var(--gold-300); background: rgb(var(--gold-rgb) / .08); box-shadow: inset 0 0 0 1px var(--line-gold); margin-bottom: 14px; }
-.drop__icon svg { width: 24px; height: 24px; }
-.drop h2, .drop h3 { font-size: var(--t-title-s); }
-.drop p { color: var(--muted); font-size: var(--t-ui); margin-top: 4px; }
-.drop input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
-/* The file box itself is invisible, so the keyboard's focus shows on the drop zone around it. */
-.drop:focus-within { outline: 2px solid var(--gold-300); outline-offset: 3px; }
-
 .segmented { display: inline-flex; padding: 4px; border-radius: var(--r); background: rgb(var(--ink) / .03); box-shadow: inset 0 0 0 1px var(--line); }
-.segmented button { height: 34px; padding: 0 16px; border: 0; border-radius: var(--r-sm); background: none; cursor: pointer; color: var(--muted); font: 500 var(--t-ui) var(--sans); transition: background .2s, color .2s, box-shadow .2s; }
+.segmented button { height: max(calc(34px * var(--ds) * var(--ts)), 34px); padding: 0 16px; border: 0; border-radius: var(--r-sm); background: none; cursor: pointer; color: var(--muted); font: 500 var(--t-ui) var(--sans); transition: background .2s, color .2s, box-shadow .2s; }
 .segmented button[aria-selected="true"], .segmented button[aria-checked="true"] { background: var(--surface-3); color: var(--text); box-shadow: inset 0 0 0 1px var(--line-2); }
 
 /* -------------------------------------------------------------- forms */
@@ -333,7 +404,7 @@ body.app::before { opacity: .6; }
   color: var(--text); font: var(--t-text) var(--sans);
   transition: box-shadow .2s, background .2s;
 }
-.input { height: 46px; }
+.input { height: max(calc(46px * var(--ds) * var(--ts)), 36px); }
 .textarea { min-height: 150px; resize: vertical; line-height: 1.55; }
 .input[aria-invalid="true"] { box-shadow: inset 0 0 0 1px rgba(229, 72, 77, .7); }
 .field__error { font-size: var(--t-note); color: var(--error-text); min-height: 0; }
@@ -346,11 +417,6 @@ body.app::before { opacity: .6; }
 .switch:checked { background: var(--gold-400); }
 .switch:checked::after { transform: translateX(18px); }
 
-.setting { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 16px 0; border-top: 1px solid var(--line); }
-.setting:first-child { border-top: 0; padding-top: 0; }
-.setting b { display: block; font-weight: 500; font-size: var(--t-text); }
-.setting span { display: block; color: var(--muted); font-size: var(--t-ui); margin-top: 2px; }
-.setting .status { display: inline-flex; margin-top: 4px; font-size: var(--t-label); }
 
 /* ------------------------------------------------------------- usage */
 
@@ -387,7 +453,7 @@ button.usage-row.is-active { background: rgb(var(--gold-rgb) / .08); box-shadow:
 /* --------------------------------------------------------------- lists */
 
 .list { list-style: none; margin: 0; padding: 0; }
-.list li { display: flex; align-items: center; gap: 14px; padding: 13px 0; border-top: 1px solid var(--line); }
+.list li { display: flex; align-items: center; gap: 14px; padding: calc(13px * var(--ds)) 0; border-top: 1px solid var(--line); }
 .list li:first-child { border-top: 0; }
 .list__icon { width: 34px; height: 34px; border-radius: var(--r); flex: none; display: grid; place-items: center; background: rgb(var(--ink) / .04); color: var(--muted); }
 .list__icon svg { width: 17px; height: 17px; }
@@ -397,8 +463,47 @@ button.usage-row.is-active { background: rgb(var(--gold-rgb) / .08); box-shadow:
 .list__masks { display: flex; gap: 5px; }
 .list__masks .m { transform: none; opacity: 1; width: 24px; height: 24px; border-radius: var(--r-sm); }
 .list__masks .m svg { width: 15px; height: 15px; }
-.empty { text-align: center; padding: 36px 16px; color: var(--muted); }
-.empty svg { width: 46px; height: 46px; margin: 0 auto 12px; color: var(--faint); }
+/* A place with nothing to show, or that could not load (ui.js stateBlock): the onyx mask, still, on a soft pool of gold
+   light, with a seal on its cheek shaped by what the empty means, then a title, one sentence and at most one button.
+   Where Sentinel could not look or could not load, the mask goes grey. Small, for a list inside a panel: the seal
+   alone beside the words. Never a verdict colour, never moving. */
+.empty { display: grid; justify-items: center; gap: 16px; padding: 32px 16px 30px; text-align: center; color: var(--text-2); }
+.empty__mark { position: relative; isolation: isolate; width: 64px; }
+.empty__mark::before { content: ''; position: absolute; z-index: -1; left: -36%; right: -36%; bottom: -14%; height: 36%; border-radius: 50%;
+  background: radial-gradient(closest-side, rgb(var(--gold-rgb) / .26), rgb(var(--gold-rgb) / .08) 60%, transparent); }
+.empty__mark img { display: block; width: 100%; height: auto; filter: drop-shadow(0 7px 9px rgb(20 12 2 / .38)); }
+.empty__seal { position: absolute; right: -9px; bottom: 1px; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%;
+  background: var(--gold-400); box-shadow: 0 0 0 2.5px var(--surface), 0 3px 8px rgb(20 12 2 / .3); }
+.empty__seal svg { width: 16px; height: 16px; fill: none; stroke: var(--on-gold, #1a1206); stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.empty--waiting .empty__seal svg { fill: currentColor; stroke: none; color: var(--on-gold, #1a1206); }
+.empty--clear .empty__seal { background: var(--green); }
+.empty--clear .empty__seal svg { stroke: var(--on-status); }
+.empty--nomatch .empty__mark img { opacity: .72; }
+:is(.empty--unavailable, .empty--error, .empty--offline) .empty__mark img { filter: grayscale(1) drop-shadow(0 7px 9px rgb(20 12 2 / .3)); opacity: .5; }
+:is(.empty--unavailable, .empty--error, .empty--offline) .empty__mark::before { opacity: .35; }
+:is(.empty--unavailable, .empty--error, .empty--offline) .empty__seal { background: var(--surface-3); }
+:is(.empty--unavailable, .empty--error, .empty--offline) .empty__seal svg { stroke: var(--text-2); }
+.empty__body { display: grid; justify-items: center; gap: 6px; min-width: 0; }
+.empty__body p { max-width: 44ch; margin: 0; font-size: var(--t-ui); line-height: 1.55; text-wrap: pretty; overflow-wrap: anywhere; }
+.empty__body .empty__title { font-size: var(--t-text); font-weight: 500; color: var(--text); }
+.empty__body > :not(p) { margin-top: 8px; }
+.empty--small { grid-template-columns: auto minmax(0, 1fr); align-items: center; justify-items: start; gap: 16px; padding: 14px 6px; text-align: left; }
+.empty--small .empty__mark { width: auto; }
+.empty--small .empty__mark::before { content: none; }
+.empty--small .empty__seal { position: static; width: 28px; height: 28px; box-shadow: var(--raise-sm); }
+.empty--small .empty__body { justify-items: start; }
+/* One quiet line, for something optional that could not load: the words and Try again side by side. */
+.empty--line { margin-top: 14px; padding: 6px 2px; gap: 12px; }
+.empty--line .empty__seal { width: 22px; height: 22px; box-shadow: none; }
+.empty--line .empty__seal svg { width: 14px; height: 14px; }
+.empty--line .empty__body { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; }
+.empty--line .empty__body p { color: var(--muted); }
+.empty--line .empty__body > :not(p) { margin-top: 0; }
+
+/* The one line under the top while nothing answers (app.js, from fetch itself). */
+.netbar { margin: 0 0 18px; padding: 10px 14px; border-radius: var(--r); font-size: var(--t-note); line-height: 1.5; color: var(--text-2); background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--line); }
+.netbar[hidden] { display: none; }
+.netbar b { color: var(--text); font-weight: 500; }
 
 /* ------------------------------------------------------------ locked */
 
@@ -478,7 +583,22 @@ button.usage-row.is-active { background: rgb(var(--gold-rgb) / .08); box-shadow:
 .banner--error { background: rgba(229, 72, 77, .06); box-shadow: inset 0 0 0 1px rgba(229, 72, 77, .3); }
 .banner b { color: var(--text); font-weight: 500; }
 
-.skeleton { border-radius: var(--r); background: linear-gradient(90deg, rgb(var(--ink) / .03), rgb(var(--ink) / .07), rgb(var(--ink) / .03)); background-size: 200% 100%; animation: shimmer 1.4s linear infinite; }
+/* A wait, still (it never had a shimmer: its keyframes did not exist). One that runs past 8 seconds says so in its own
+   place; a call that never answers ends at 75 seconds (ui.js api) with Try again. No timer: the note is a delayed style. */
+.skeleton { position: relative; border-radius: var(--r); background: linear-gradient(90deg, rgb(var(--ink) / .03), rgb(var(--ink) / .07), rgb(var(--ink) / .03)); background-size: 200% 100%; }
+/* First-time heights: what a new account sees in each place (measured by the states check). After that, app.js keeps
+   the height each place really had on this device. */
+.h-recent { height: 56px; } .h-week { height: 513px; } .h-stats { height: 186px; } .h-history { height: 359px; }
+.h-allow, .h-block { height: 147px; } .h-devices { height: 113px; } .h-assistants { height: 1026px; }
+@media (max-width: 699px) {
+  .h-recent { height: 71px; } .h-week { height: 644px; } .h-history { height: 469px; } .h-allow { height: 168px; } .h-devices { height: 154px; } .h-assistants { height: 538px; }
+}
+.usage-list > .skeleton { grid-column: 1 / -1; }
+.skeleton:is([data-skel], .u-h-sm, .desktop-skeleton)::after { content: 'This is taking longer than usual.'; position: absolute; inset: 0; display: grid; place-items: center; padding: 16px;
+  font-size: var(--t-note); color: var(--muted); text-align: center; visibility: hidden; animation: skeleton-late 0s 8s forwards; }
+@keyframes skeleton-late { to { visibility: visible; } }
+/* The wait is a fact, not motion: Motion Off (sentinel.css zeroes every delay) still says it after 8 seconds. */
+:root[data-motion="off"] .skeleton:is([data-skel], .u-h-sm, .desktop-skeleton)::after { animation-delay: 8s !important; }
 
 /* ------------------------------------------------------------ auth pages */
 
@@ -573,7 +693,9 @@ body:has(.auth)::before { animation: none; }
 .side__search { display: flex; align-items: center; gap: 9px; width: 100%; margin: 14px 0 6px; padding: 0 12px; height: 38px; border: 0; border-radius: var(--r); cursor: pointer; text-align: left; color: var(--muted); font: var(--t-ui) var(--sans); background: rgb(var(--ink) / .035); box-shadow: inset 0 0 0 1px var(--line); transition: color .2s, box-shadow .2s; }
 .side__search:hover { color: var(--text); box-shadow: inset 0 0 0 1px var(--line-2); }
 .side__search svg { width: 15px; height: 15px; flex: none; }
-.side__search span { flex: 1; }
+.side__search span { flex: 1; white-space: nowrap; }
+/* At a larger text size the words and the shortcut do not both fit: the words stay, the shortcut is in its name. */
+:root[data-text] .side__search kbd { display: none; }
 kbd { font: var(--t-micro) var(--mono); color: var(--muted); padding: 2px 6px; border-radius: var(--r-sm); background: rgb(var(--ink) / .05); box-shadow: inset 0 0 0 1px var(--line); }
 
 .tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 14px 0 12px; }
@@ -670,6 +792,8 @@ select.input option { background: var(--surface-3); color: var(--text); }
 /* Verification reminder shown until the address is confirmed. */
 .verify-bar { display: flex; gap: 14px; align-items: center; justify-content: space-between; flex-wrap: wrap; margin-bottom: 18px; padding: 12px 16px; border-radius: var(--r); font-size: var(--t-ui); color: var(--text-2); background: rgb(var(--gold-rgb) / .07); box-shadow: inset 0 0 0 1px var(--line-gold); }
 .verify-bar b { color: var(--text); font-weight: 500; }
+/* On a phone's Check page the notice folds to one line, so the box and its Check button stay on screen. */
+@media (max-width: 560px) { #view:has(.ask) .verify-bar { flex-wrap: nowrap; padding: 8px 8px 8px 14px; margin-bottom: 12px; } #view:has(.ask) .verify-bar__more { display: none; } }
 .shell--guest { grid-template-columns: 1fr; }
 .shell--guest .main { max-width: 1040px; margin: 0 auto; }
 
@@ -689,7 +813,7 @@ select.input option { background: var(--surface-3); color: var(--text); }
 .feed__empty { padding: 14px 0; font-size: var(--t-ui); }
 .live-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--faint); flex: none; }
 .live-dot.is-on { background: var(--green); animation: pulse 1.8s ease-out infinite; }
-@media (prefers-reduced-motion: reduce) { .feed__item { transition: none; } .live-dot.is-on { animation: none; } }
+:root[data-motion="off"] { .feed__item { transition: none; } .live-dot.is-on { animation: none; } }
 
 /* The mask as a navigation icon, sized like the stroke icons beside it. */
 .side__glyph { width: 18px; height: 18px; flex: none; display: inline-grid; place-items: center; }
@@ -710,8 +834,6 @@ select.input option { background: var(--surface-3); color: var(--text); }
 .live__text p { margin: 0; color: var(--muted); font-size: var(--t-ui); }
 .live__text .live__counts { margin-top: 6px; font-size: var(--t-note); color: var(--faint); font-variant-numeric: tabular-nums; }
 .live__button { flex: none; min-width: 150px; }
-/* The auto scanning switch sits under the main row; .setting:first-child would otherwise drop its divider. */
-.live__auto.setting { margin-top: 18px; padding: 16px 0 0; border-top: 1px solid var(--line); }
 /* The real site, for a result that imitates one (ui.js realSite). */
 .real-site { margin: 0; padding: 0 30px 22px 118px; }
 @media (max-width: 560px) { .real-site { padding: 0 20px 18px; } }
@@ -728,8 +850,6 @@ select.input option { background: var(--surface-3); color: var(--text); }
 .live__facts { margin: 20px 0 0; padding: 16px 0 0; list-style: none; display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px 28px;
   border-top: 1px solid var(--line); color: var(--muted); font-size: var(--t-note); line-height: 1.5; }
 .live__facts li { padding-left: 14px; position: relative; }
-.my-sites__add { display: flex; gap: 10px; margin-top: 14px; }
-.my-sites__add .input { flex: 1; min-width: 0; }
 .live__facts li::before { content: ""; position: absolute; left: 0; top: .55em; width: 5px; height: 5px; border-radius: 1px; background: var(--gold-500); }
 /* Exposure alerts: a listed site, what it means, and what to do. */
 .exposure { align-items: flex-start; }
@@ -743,12 +863,25 @@ select.input option { background: var(--surface-3); color: var(--text); }
 
 /* ---------- Fast / Delicate ---------- */
 .seg { display: inline-flex; flex: none; border: 1px solid var(--line-2); border-radius: var(--r-sm); overflow: hidden; }
-.seg__btn { height: 38px; padding: 0 14px; border: 0; background: transparent; color: var(--muted); font: inherit; font-size: var(--t-ui); cursor: pointer; }
+.seg__btn { height: max(calc(38px * var(--ds) * var(--ts)), 36px); padding: 0 14px; border: 0; background: transparent; color: var(--muted); font: inherit; font-size: var(--t-ui); cursor: pointer; }
 .seg__btn + .seg__btn { border-left: 1px solid var(--line-2); }
 /* The button gold: white on it is 5.3:1 in light, where the paler gold-500 fell short of 4.5:1. */
 .seg__btn.is-on { background: var(--gold-grad); color: var(--on-gold); font-weight: 600; }
 .seg__btn:disabled { opacity: .45; cursor: not-allowed; }
 .seg__btn:focus-visible { outline: 2px solid var(--gold-300); outline-offset: -2px; }
+/* Motion (boot.js control): the same segments over real radio buttons, so the arrow keys move between them. When the
+   computer asks for less motion they are locked, and Off stays plainly chosen. */
+label.seg__btn { position: relative; display: inline-flex; align-items: center; }
+.seg__btn:has(:focus-visible) { outline: 2px solid var(--gold-300); outline-offset: -2px; }
+.seg__btn:has(:disabled):not(.is-on) { opacity: .45; cursor: not-allowed; }
+.seg__btn:has(:disabled).is-on { cursor: default; }
+/* Its two lines, inside a Settings row: what the chosen level does beside the segments, the scan effect beside its switch. */
+.motion-set .setting { display: flex; align-items: center; justify-content: space-between; gap: 12px 28px; padding: 14px 0 0; }
+.motion-set .setting:first-child { padding-top: 4px; }
+.motion-set .setting b { display: block; font-weight: 500; font-size: var(--t-text); color: var(--text); }
+.motion-set .setting span { display: block; max-width: 56ch; margin-top: 2px; color: var(--muted); font-size: var(--t-note); line-height: 1.45; }
+.motion-set .setting > .switch, .motion-set .setting > .seg { flex: none; }
+@media (max-width: 560px) { .motion-set .setting:first-child { flex-wrap: wrap; } }
 .meters { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
 .meters__head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
 .meters__item p { margin: 8px 0 0; font-size: var(--t-note); color: var(--muted); }
@@ -763,8 +896,6 @@ select.input option { background: var(--surface-3); color: var(--text); }
 .u-mb { margin-bottom: 16px; }
 .u-ml { margin-left: 8px; }
 .u-h-sm { height: 110px; }
-.u-h-md { height: 120px; }
-.u-h-lg { height: 220px; }
 .u-gold { color: var(--gold-300); }
 
 /* Small pieces the app's views share, in place of inline styles. */
@@ -776,7 +907,6 @@ select.input option { background: var(--surface-3); color: var(--text); }
 .gate h1 { font-size: var(--t-title-l); }
 .panel--danger { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--red) 30%, transparent); }
 /* Chat or texts not being watched: said in the ordinary text colour, a step up from the grey around it, never red or bold. */
-.muted.is-down { color: var(--text); }
 .btn--danger { color: var(--error-text); }
 .connect-head { display: flex; gap: 14px; align-items: center; }
 .ai-tab__mark--lg { width: 44px; height: 44px; border-radius: var(--r); font-size: var(--t-ui); }
@@ -800,7 +930,7 @@ select.input option { background: var(--surface-3); color: var(--text); }
 .fchip[aria-pressed="true"] { background: var(--bg-2); box-shadow: var(--press); }
 .ai-tab[aria-selected="true"] { box-shadow: var(--raise-sm), inset 0 0 0 1px color-mix(in srgb, var(--accent) 70%, transparent); }
 /* Pressed: fields and wells sit below the surface. */
-.scanbox, .input, .textarea, .segmented, .seg, .tools__search, .secret, .drop, .consent__row input { background-color: var(--bg-2); box-shadow: var(--press); }
+.scanbox, .input, .textarea, .segmented, .seg, .tools__search, .secret, .consent__row input { background-color: var(--bg-2); box-shadow: var(--press); }
 .seg { border: 0; padding: 4px; gap: 4px; border-radius: var(--r); }
 .seg__btn { border-radius: var(--r-sm); }
 .seg__btn + .seg__btn { border-left: 0; }
@@ -812,7 +942,6 @@ select.input option { background: var(--surface-3); color: var(--text); }
 .input:focus, .textarea:focus { box-shadow: var(--press), inset 0 0 0 1px var(--gold-300), 0 0 0 4px rgb(var(--gold-rgb) / .16); }
 .input[aria-invalid="true"] { box-shadow: var(--press), inset 0 0 0 1px var(--red); }
 .input:-webkit-autofill { -webkit-text-fill-color: var(--text); box-shadow: var(--press), inset 0 0 0 1px var(--field-ring), inset 0 0 0 100px var(--field-bg); }
-.drop:hover, .drop.is-over { box-shadow: var(--press), 0 0 0 1px rgb(var(--gold-rgb) / .55); }
 .consent__row input:checked { background: var(--gold-grad); box-shadow: inset 0 1px 0 rgb(255 255 255 / .4); }
 .switch { background: var(--bg-2); box-shadow: var(--press); }
 .switch:checked { background: var(--gold-grad); box-shadow: inset 0 1px 3px rgb(0 0 0 / .25); }
@@ -874,5 +1003,5 @@ select.input option { background: var(--surface-3); color: var(--text); }
 .model-badge:hover { background: rgb(var(--gold-rgb) / .14); box-shadow: inset 0 0 0 1px rgb(var(--gold-rgb) / .45), 0 0 18px -4px rgb(var(--gold-rgb) / .6); }
 .model-badge__dot { width: 6px; height: 6px; border-radius: 50%; background: var(--gold-300); box-shadow: 0 0 8px var(--gold-300); animation: model-pulse 2.6s ease-in-out infinite; }
 @keyframes model-pulse { 50% { opacity: .35; } }
-@media (prefers-reduced-motion: reduce) { .model-badge__dot { animation: none; } }
+:root[data-motion="off"] { .model-badge__dot { animation: none; } }
 
