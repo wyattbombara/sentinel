@@ -15,15 +15,17 @@
   'use strict';
 
   // h: OKLCH hue; c: depth against gold's. dark: on dark grounds gold's own depth reads as pastel in a cool hue, so
-  // each takes more (c) and sits a little lower (l); words are then lifted back only as far as 4.5:1 needs. The
-  // website's colour preview (accent.js on work/e2e-c-rainbow) uses these same rows.
+  // each takes more (c) and sits a little lower (l); words are then lifted back only as far as 4.5:1 needs. light:
+  // deepened to 4.5:1 with gold's depth, every hue landed on one muddy shade, so each takes its own: rose and teal
+  // stay as light as 4.5:1 allows (teal has no more depth to give on a screen), amethyst and sapphire go deep and
+  // vivid, platinum to graphite. The website's colour preview (accent.js) uses these same rows.
   var ACCENTS = [
     { id: 'gold', name: 'Gold' },
-    { id: 'rose', name: 'Rose', h: 354, c: 0.95, dark: { c: 1.55, l: -0.05 } },
-    { id: 'amethyst', name: 'Amethyst', h: 308, c: 1, dark: { c: 1.7, l: -0.06 } },
-    { id: 'sapphire', name: 'Sapphire', h: 262, c: 1.05, dark: { c: 1.75, l: -0.07 } },
-    { id: 'teal', name: 'Teal', h: 200, c: 0.85, dark: { c: 1.65, l: -0.06 } },
-    { id: 'platinum', name: 'Platinum', h: 255, c: 0.12, dark: { c: 0.2, l: 0 } }
+    { id: 'rose', name: 'Rose', h: 354, c: 0.95, dark: { c: 1.55, l: -0.05 }, light: { c: 1.6, l: 0.01 } },
+    { id: 'amethyst', name: 'Amethyst', h: 308, c: 1, dark: { c: 1.7, l: -0.06 }, light: { c: 1.7, l: -0.045 } },
+    { id: 'sapphire', name: 'Sapphire', h: 262, c: 1.05, dark: { c: 1.75, l: -0.07 }, light: { c: 1.75, l: -0.075 } },
+    { id: 'teal', name: 'Teal', h: 200, c: 0.85, dark: { c: 1.65, l: -0.06 }, light: { c: 1, l: 0 } },
+    { id: 'platinum', name: 'Platinum', h: 255, c: 0.12, dark: { c: 0.2, l: 0 }, light: { c: 0.18, l: -0.1 } }
   ];
   var BY_ID = {};
   for (var i = 0; i < ACCENTS.length; i++) BY_ID[ACCENTS[i].id] = ACCENTS[i];
@@ -44,9 +46,9 @@
       app: { acc: '#d6b25a', hi: '#e2c47f', lite: '#fff4d2' }
     },
     light: {
-      web: { 50: '#3d2c0c', 200: '#6f5217', 300: '#7d5c1c', 400: '#8a6420', 500: '#9c7229', 600: '#b08433',
+      web: { 50: '#3d2c0c', 200: '#6f5217', 300: '#75540d', 400: '#7c5a0b', 500: '#9c7229', 600: '#b08433',
         grad: ['#98712a', '#8a6420', '#6f4f16'], hover: ['#96701f', '#7a5818', '#624512'], metal: ['#c79a45', '#9a7029', '#5e4210', '#a8803a', '#4c3409'] },
-      app: { acc: '#8a6420', hi: '#7d5c1c', lite: '#6f5217' }
+      app: { acc: '#7c5a0b', hi: '#75540d', lite: '#6f5217' }
     },
     metal: { shadow: '#5a4216', light: '#fff0c4', face: '#d9b65f' }
   };
@@ -201,10 +203,20 @@
 
   /* --------------------------------------------------------------- the choice */
 
-  /** Anything stored, sent or typed becomes a known look: unknown words mean Auto and Gold, never an error. */
+  // Text size and spacing (boot.js SentinelType) travel with the look, so the companion and the person's other devices
+  // follow them too. The first of each list is the default.
+  var TEXT = ['standard', 'large', 'larger'];
+  var DENSITY = ['comfortable', 'compact'];
+  var KEYS = ['mode', 'accent', 'text', 'density'];
+  /** Anything stored, sent or typed becomes a known look: unknown words mean Auto, Gold, Standard and Comfortable, never an error. */
   function normal(look) {
     look = look && typeof look === 'object' ? look : {};
-    return { mode: look.mode === 'light' || look.mode === 'dark' ? look.mode : 'auto', accent: BY_ID[look.accent] ? look.accent : 'gold' };
+    return {
+      mode: look.mode === 'light' || look.mode === 'dark' ? look.mode : 'auto',
+      accent: BY_ID[look.accent] ? look.accent : 'gold',
+      text: TEXT.indexOf(look.text) > 0 ? look.text : TEXT[0],
+      density: DENSITY.indexOf(look.density) > 0 ? look.density : DENSITY[0]
+    };
   }
   /**
    * The look as it travels between the site, the app, the Windows app and the companion: each setting with the time
@@ -214,17 +226,26 @@
     r = r && typeof r === 'object' ? r : {};
     var look = normal(r), at = r.at && typeof r.at === 'object' ? r.at : {};
     var when = function (k) { var t = Number(at[k]); return isFinite(t) && t > 0 ? Math.floor(t) : 0; };
-    return { mode: look.mode, accent: look.accent, at: { mode: when('mode'), accent: when('accent') } };
+    look.at = {};
+    KEYS.forEach(function (k) { look.at[k] = when(k); });
+    return look;
   }
   /** Two records made one: each setting from whichever chose it last. A tie keeps `a`. */
   function merge(a, b) {
     a = record(a); b = record(b);
     var out = { at: {} };
-    ['mode', 'accent'].forEach(function (k) { var w = b.at[k] > a.at[k] ? b : a; out[k] = w[k]; out.at[k] = w.at[k]; });
+    KEYS.forEach(function (k) { var w = b.at[k] > a.at[k] ? b : a; out[k] = w[k]; out.at[k] = w.at[k]; });
     return out;
   }
   /** When a record last changed: the companion compares it with what it holds and asks again only when it moved. */
-  function rev(r) { r = record(r); return Math.max(r.at.mode, r.at.accent); }
+  function rev(r) { r = record(r); return Math.max.apply(null, KEYS.map(function (k) { return r.at[k]; })); }
+  /** Text size and spacing on an element (normally <html>) as fonts.css and the stylesheets read them, as boot.js sets them. */
+  function type(el, look) {
+    look = normal(look);
+    if (look.text === TEXT[0]) el.removeAttribute('data-text'); else el.setAttribute('data-text', look.text);
+    if (look.density === DENSITY[0]) el.removeAttribute('data-density'); else el.setAttribute('data-density', look.density);
+    return look;
+  }
 
   var mq = root.matchMedia ? root.matchMedia('(prefers-color-scheme: light)') : null;
   function scheme(mode) { return mode === 'light' || mode === 'dark' ? mode : mq && mq.matches ? 'light' : 'dark'; }
@@ -251,13 +272,13 @@
     return normal({ mode: q.get('theme'), accent: q.get('accent') });
   }
 
-  var api = { ACCENTS: ACCENTS, STATUS: STATUS, GOLD: GOLD, SHEET: SHEET, LUX: LUX, ramp: ramp, metal: metal, tintBitmap: tintBitmap, normal: normal, record: record, merge: merge, rev: rev, scheme: scheme, paint: paint, dark: dark, fromQuery: fromQuery, contrast: contrast, toOklch: toOklch };
+  var api = { ACCENTS: ACCENTS, STATUS: STATUS, GOLD: GOLD, SHEET: SHEET, LUX: LUX, ramp: ramp, metal: metal, tintBitmap: tintBitmap, normal: normal, record: record, merge: merge, rev: rev, KEYS: KEYS, TEXT: TEXT, DENSITY: DENSITY, type: type, scheme: scheme, paint: paint, dark: dark, fromQuery: fromQuery, contrast: contrast, toOklch: toOklch };
   root.SentinelLook = api;
   if (typeof module === 'object' && module.exports) { module.exports = api; return; }
   // The companion's own pages (popup, block page, settings): the look the Windows app gave it (popup.js asks the app
-  // and keeps it here), drawn before the first paint. Without the app: Auto and Gold.
+  // and keeps it here), drawn before the first paint, text size and spacing too. Without the app: Auto and Gold.
   if (typeof document !== 'undefined' && /^(chrome|moz)-extension:$/.test(location.protocol)) {
-    try { paint(document.documentElement, JSON.parse(localStorage.getItem('sentinel:look'))); } catch (e) { /* storage blocked: Auto and Gold */ }
+    try { var kept = JSON.parse(localStorage.getItem('sentinel:look')); paint(document.documentElement, kept); type(document.documentElement, kept); } catch (e) { /* storage blocked: Auto and Gold */ }
     return;
   }
 })(typeof globalThis !== 'undefined' ? globalThis : this);
