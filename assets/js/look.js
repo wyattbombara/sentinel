@@ -31,9 +31,12 @@
   for (var i = 0; i < ACCENTS.length; i++) BY_ID[ACCENTS[i].id] = ACCENTS[i];
 
   // Danger, warning, caution and safe, as sentinel.css has them for each scheme. Never derived from the accent.
+  // Caution is one yellow in both schemes. No yellow dark enough to be read as words on light paper still looks like
+  // caution (1.20.1's #8a6100 was gold's own hue), so on light it is a fill: a mark's disc or a chip, with ink words
+  // on it or beside it (sentinel.css --yellow-ink, card.js status). tests/look.test.js holds both to it.
   var STATUS = {
     dark: { red: '#e5484d', orange: '#f08a24', yellow: '#f5c542', green: '#4cb782' },
-    light: { red: '#b3261e', orange: '#b04a00', yellow: '#8a6100', green: '#1a6e35' }
+    light: { red: '#b3261e', orange: '#a14400', yellow: '#f5c542', green: '#1a6e35' }
   };
 
   // Gold as it is drawn today. web: sentinel.css's ramp (the others are made from it); app: the surfaces without a
@@ -237,6 +240,14 @@
     KEYS.forEach(function (k) { var w = b.at[k] > a.at[k] ? b : a; out[k] = w[k]; out.at[k] = w.at[k]; });
     return out;
   }
+  /**
+   * The settings this device chose before its account heard of them, which another device then chose differently and
+   * later: the later one is kept (merge), and the person is told. `sent`: the record the account last gave back here.
+   */
+  function overruled(local, sent, account) {
+    local = record(local); sent = record(sent); account = record(account);
+    return KEYS.filter(function (k) { return local.at[k] > sent.at[k] && account.at[k] > local.at[k] && account[k] !== local[k]; });
+  }
   /** When a record last changed: the companion compares it with what it holds and asks again only when it moved. */
   function rev(r) { r = record(r); return Math.max.apply(null, KEYS.map(function (k) { return r.at[k]; })); }
   /** Text size and spacing on an element (normally <html>) as fonts.css and the stylesheets read them, as boot.js sets them. */
@@ -272,7 +283,7 @@
     return normal({ mode: q.get('theme'), accent: q.get('accent') });
   }
 
-  var api = { ACCENTS: ACCENTS, STATUS: STATUS, GOLD: GOLD, SHEET: SHEET, LUX: LUX, ramp: ramp, metal: metal, tintBitmap: tintBitmap, normal: normal, record: record, merge: merge, rev: rev, KEYS: KEYS, TEXT: TEXT, DENSITY: DENSITY, type: type, scheme: scheme, paint: paint, dark: dark, fromQuery: fromQuery, contrast: contrast, toOklch: toOklch };
+  var api = { ACCENTS: ACCENTS, STATUS: STATUS, GOLD: GOLD, SHEET: SHEET, LUX: LUX, ramp: ramp, metal: metal, tintBitmap: tintBitmap, normal: normal, record: record, merge: merge, overruled: overruled, rev: rev, KEYS: KEYS, TEXT: TEXT, DENSITY: DENSITY, type: type, scheme: scheme, paint: paint, dark: dark, fromQuery: fromQuery, contrast: contrast, toOklch: toOklch };
   root.SentinelLook = api;
   if (typeof module === 'object' && module.exports) { module.exports = api; return; }
   // The companion's own pages (popup, block page, settings): the look the Windows app gave it (popup.js asks the app
