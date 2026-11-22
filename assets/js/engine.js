@@ -2,13 +2,17 @@
 (() => {
 'use strict';
 const wordsUrl = new URL('../data/words.txt.gz', document.currentScript.src).href;
+// The most linked-to sites (url.js popularSites): elle.com is not Zelle here either.
+const popularUrl = new URL('../data/wellknown.txt.gz', document.currentScript.src).href;
 let words = '';
+let popular = '';
 const builtins = {
   '../../config': { isProd: true },
   // Only urlKey hashes, for exact-address list lookups, which do not run here.
   crypto: { createHash() { throw new Error('No hashing here'); } },
-  fs: { readFileSync: () => null },
-  path: { join: () => '' },
+  // url.js reads only wellknown.txt this way; the word list comes through zlib.
+  fs: { readFileSync: (file) => (file === 'wellknown.txt' ? popular : null) },
+  path: { join: (...parts) => parts[parts.length - 1] },
   // url.js unpacks its word list with these; the list is fetched and unpacked before the first check.
   zlib: { gunzipSync: () => ({ toString: () => words }) }
 };
@@ -33,9 +37,10 @@ const BRANDS = [
   { token: 'venmo', domains: ['venmo.com'] },
   { token: 'zelle', domains: ['zellepay.com', 'zelle.com'] },
   { token: 'cashapp', domains: ['cash.app', 'square.com', 'squareup.com'] },
-  // A brand's own name on a generic ending (stripe.dev, dropbox.tech, spotify.design) is its developer, design or
-  // engineering site. Listed one by one, and only the ones the brand itself runs: any other stays borrowed.
-  { token: 'stripe', domains: ['stripe.com', 'stripe.network', ...cc('stripe', ['dev', 'press'])] },
+  // A brand's own name on a generic ending (stripe.dev, dropbox.design, spotify.design) is its developer, design or
+  // engineering site. Listed one by one, and only the ones proven the brand's own (scripts/brand-proof.js, run by
+  // .github/workflows/brand-proof.yml on every change here): any other stays borrowed.
+  { token: 'stripe', domains: ['stripe.com', 'stripe.network', 'stripe.dev'] },
   { token: 'wise', domains: ['wise.com', 'transferwise.com'] },
   { token: 'revolut', domains: ['revolut.com', 'revolut.me'] },
   { token: 'chase', domains: ['chase.com', 'chase.co.uk', 'jpmorganchase.com', 'jpmorgan.com'] },
@@ -67,14 +72,14 @@ const BRANDS = [
   { token: 'office365', domains: ['office.com', 'office365.com', 'microsoft.com'] },
   { token: 'onedrive', domains: ['onedrive.com', 'live.com', 'microsoft.com', 'sharepoint.com'] },
   { token: 'sharepoint', domains: ['sharepoint.com', 'microsoft.com'] },
-  { token: 'google', domains: [...cc('google', GOOGLE_CC), 'googleapis.com', 'gstatic.com', 'googleusercontent.com', 'googlevideo.com', 'withgoogle.com', 'googlemail.com', 'goo.gl', 'g.co', 'gmail.com', 'youtube.com', 'google', ...cc('google', ['dev', 'org'])] },
+  { token: 'google', domains: [...cc('google', GOOGLE_CC), 'googleapis.com', 'gstatic.com', 'googleusercontent.com', 'googlevideo.com', 'withgoogle.com', 'googlemail.com', 'goo.gl', 'g.co', 'gmail.com', 'youtube.com', 'google', 'google.dev'] },
   { token: 'gmail', domains: ['gmail.com', 'google.com'] },
   { token: 'youtube', domains: ['youtube.com', 'youtu.be', 'ytimg.com', 'youtube-nocookie.com'] },
   { token: 'amazon', domains: [...cc('amazon', AMAZON_CC), 'amazonaws.com', 'amazon.dev', 'a2z.com', 'amzn.to', 'media-amazon.com', 'primevideo.com', 'aboutamazon.com', 'amazonpay.com', 'amazon.jobs', 'amazon.science'] },
   { token: 'netflix', domains: ['netflix.com', 'nflxext.com', 'nflximg.net', 'netflix.net', 'netflix.shop'] },
   { token: 'spotify', domains: ['spotify.com', 'spotify.link', 'scdn.co', 'spoti.fi', 'spotify.design'] },
-  { token: 'adobe', domains: ['adobe.com', 'adobe.io', 'adobelogin.com', 'typekit.net', 'adobe.design'] },
-  { token: 'dropbox', domains: ['dropbox.com', 'dropboxmail.com', 'dropboxusercontent.com', 'db.tt', ...cc('dropbox', ['tech', 'design'])] },
+  { token: 'adobe', domains: ['adobe.com', 'adobe.io', 'adobelogin.com', 'typekit.net'] },
+  { token: 'dropbox', domains: ['dropbox.com', 'dropboxmail.com', 'dropboxusercontent.com', 'db.tt', 'dropbox.design'] },
   { token: 'docusign', domains: ['docusign.com', 'docusign.net'] },
   // Link shorteners: a page named for one pretends to be a short link you can trust to forward you.
   { token: 'tinyurl', domains: ['tinyurl.com'] },
@@ -121,13 +126,13 @@ const BRANDS = [
   { token: 'workday', domains: ['workday.com', 'myworkday.com', 'workdaysuite.com'] },
   { token: 'wetransfer', domains: ['wetransfer.com', 'we.tl'] },
   { token: 'zoom', domains: ['zoom.us', 'zoom.com', 'zoomgov.com'] },
-  { token: 'openai', domains: ['openai.com', 'chatgpt.com', 'oaistatic.com', 'openai.fund'] },
+  { token: 'openai', domains: ['openai.com', 'chatgpt.com', 'oaistatic.com'] },
   { token: 'chatgpt', domains: ['chatgpt.com', 'openai.com'] },
   { token: 'anthropic', domains: ['anthropic.com', 'claude.ai', 'claude.com'] },
   { token: 'deepseek', domains: ['deepseek.com'] },
 
   // Social
-  { token: 'facebook', domains: ['facebook.com', 'fb.com', 'fb.me', 'fbcdn.net', 'messenger.com', 'meta.com', 'facebook.net', 'facebookmail.com', 'facebook.design'] },
+  { token: 'facebook', domains: ['facebook.com', 'fb.com', 'fb.me', 'fbcdn.net', 'messenger.com', 'meta.com', 'facebook.net', 'facebookmail.com'] },
   { token: 'instagram', domains: ['instagram.com', 'cdninstagram.com', 'ig.me'] },
   { token: 'whatsapp', domains: ['whatsapp.com', 'whatsapp.net', 'wa.me'] },
   { token: 'linkedin', domains: ['linkedin.com', 'lnkd.in', 'licdn.com'] },
@@ -140,7 +145,7 @@ const BRANDS = [
   // Shopping and delivery
   { token: 'ebay', domains: cc('ebay', EBAY_CC).concat(['ebayimg.com', 'ebaystatic.com']) },
   { token: 'walmart', domains: ['walmart.com', 'walmart.ca', 'walmartimages.com'] },
-  { token: 'shopify', domains: ['shopify.com', 'myshopify.com', 'shopifycdn.com', 'shopify.engineering'] },
+  { token: 'shopify', domains: ['shopify.com', 'myshopify.com', 'shopifycdn.com'] },
   { token: 'shopee', domains: ['shopee.com', 'shopee.co.id', 'shopee.com.my', 'shopee.sg', 'shopee.ph', 'shopee.vn', 'shopee.co.th', 'shopee.tw', 'shopee.com.br'] },
   { token: 'aliexpress', domains: ['aliexpress.com', 'aliexpress.us', 'alicdn.com'] },
   { token: 'temu', domains: ['temu.com'] },
@@ -177,11 +182,11 @@ const BRANDS = [
   // Telecom
   { token: 'comcast', domains: ['comcast.com', 'comcast.net', 'xfinity.com'] },
   { token: 'xfinity', domains: ['xfinity.com', 'comcast.com', 'comcast.net'] },
-  { token: 'verizon', domains: ['verizon.com', 'verizonwireless.com', 'vzw.com', 'verizon.net'] },
+  { token: 'verizon', domains: ['verizon.com', 'verizonwireless.com', 'vzw.com'] },
   { token: 'tmobile', domains: ['t-mobile.com', 'tmobile.com'] },
 
   // Crypto
-  { token: 'binance', domains: ['binance.com', 'binance.us', 'bnbstatic.com', ...cc('binance', ['org', 'vision'])] },
+  { token: 'binance', domains: ['binance.com', 'binance.us', 'bnbstatic.com', 'binance.vision'] },
   { token: 'coinbase', domains: ['coinbase.com', 'cbhq.net', 'base.org'] },
   { token: 'walletconnect', domains: ['walletconnect.com', 'walletconnect.network', 'walletconnect.org', 'reown.com'] },
   { token: 'metamask', domains: ['metamask.io'] },
@@ -384,7 +389,8 @@ const NOT_LOOKALIKES = new Set([
  *
  * Made by scripts/foreign-words.js on GitHub's machines from hermitdave/FrequencyWords, 2018 (the 50,000 most frequent
  * words of OpenSubtitles2018 per language; https://github.com/hermitdave/FrequencyWords, content CC BY-SA 4.0), then
- * read through by hand: first names and words built on a brand ("googlen", "amazone", "tresor") taken out. This
+ * read through by hand: first names and words built on a brand ("googlen", "amazone", "tresor") taken out, and
+ * "telegramm" (German) put in, which the script leaves out for its doubled letter. This
  * list is an adaptation of that content and is shared under the same licence, CC BY-SA 4.0.
  */
 const FOREIGN_WORDS = new Set([
@@ -411,7 +417,7 @@ const FOREIGN_WORDS = new Set([
   'revolucionarias', 'revolucionario', 'revolucionarios', 'revoluciones', 'revolucoes', 'revolue', 'revolutie', 'revoluties', 'revolutionaire', 'revolutionairen', 'revolutionar', 'revolutionare',
   'revolutionaren', 'revolutionen', 'revolutionieren', 'revolutionnaire', 'revolutionnaires', 'revolutionne', 'revolutionner', 'rhein', 'schein', 'schwan', 'stirpe', 'strade',
   'stram', 'surpasse', 'surpassee', 'surpassent', 'surpasser', 'tecla', 'telegraaf', 'telegrafieren', 'telegrafiert', 'telegrafo', 'telegrafos',
-  'telegramma', 'telegrammi', 'telegraphe', 'telegraphie', 'telle', 'trist', 'trugst', 'unhold', 'unpassend', 'unpasslich', 'venco',
+  'telegramm', 'telegramma', 'telegrammi', 'telegraphe', 'telegraphie', 'telle', 'trist', 'trugst', 'unhold', 'unpassend', 'unpasslich', 'venco',
   'vendo', 'vengo', 'venho', 'vento', 'verzon', 'verzonden', 'verzonken', 'verzonnen', 'welle', 'zellen', 'zelte',
   'zelve', 'zonzo'
 ]);
@@ -423,12 +429,15 @@ const URL_SHORTENERS = new Set([
 ]);
 
 // Email services' and mail filters' click counters: the address the reader will reach is not in the link, so the
-// link's words cannot be held against it (url.js shownVersusReal). Shorteners hide it the same way.
+// link's words cannot be held against it (url.js shownVersusReal). Shorteners hide it the same way. Among them
+// Iterable, Postmark, Customer.io, Pardot, Brevo (sendibt) and Campaign Monitor (createsend, cmail1 to cmail30).
 const CLICK_TRACKERS = [
   'list-manage.com', 'mailchi.mp', 'rs6.net', 'sendgrid.net', 'awstrack.me', 'mandrillapp.com', 'hubspotlinks.com',
   'klclick.com', 'klclick1.com', 'klclick2.com', 'klclick3.com', 'sparkpostmail.com', 'exct.net', 'mlsend.com',
-  'createsend1.com', 'cmail19.com', 'cmail20.com', 'mailgun.org', 'convertkit-mail.com', 'convertkit-mail2.com',
-  'urldefense.com', 'urldefense.proofpoint.com', 'mimecast.com', 'substack.com', 'beehiiv.com', 'app.link'
+  'createsend1.com', 'mailgun.org', 'convertkit-mail.com', 'convertkit-mail2.com',
+  'urldefense.com', 'urldefense.proofpoint.com', 'mimecast.com', 'substack.com', 'beehiiv.com', 'app.link',
+  'iterable.com', 'pstmrk.it', 'customeriomail.com', 'pardot.com', 'sendibt2.com', 'sendibt3.com',
+  'createsend.com', ...Array.from({ length: 30 }, (_, i) => `cmail${i + 1}.com`)
 ];
 
 // Free site builders and hosting subdomains: legitimate, but a favourite home for phishing kits.
@@ -803,7 +812,10 @@ function decodeLabel(label) {
     out.splice(i++, 0, n);
   }
   const name = String.fromCodePoint(...out);
-  return /[^\x00-\x7f]/.test(name) && /^[\p{L}\p{M}\p{Nd}-]+$/u.test(name) ? name : null;
+  // The zero-width joiners Persian and Indic names are spelled with count between two letters of such a script;
+  // never beside a Latin letter, where they only hide.
+  const letters = name.replace(/(?<=[\p{M}]|[^\P{L}\p{Script=Latin}])[‌‍](?=[^\P{L}\p{Script=Latin}])/gu, '');
+  return /[^\x00-\x7f]/.test(name) && /^[\p{L}\p{M}\p{Nd}-]+$/u.test(letters) ? name : null;
 }
 
 /** A host with each international label decoded; the host as written when one does not decode. */
@@ -821,7 +833,10 @@ const CONFUSABLES = {
   // Greek: 03B1 03F2 03B9 03F3 03BF 03C1 03C5 03BD 03B3
   'α': 'a', 'ϲ': 'c', 'ι': 'i', 'ϳ': 'j', 'ο': 'o', 'ρ': 'p', 'υ': 'u', 'ν': 'v', 'γ': 'y',
   // Armenian: 0581 0570 0578 0585 0566 057D 0561
-  'ց': 'g', 'հ': 'h', 'ո': 'n', 'օ': 'o', 'զ': 'q', 'ս': 'u', 'ա': 'w'
+  'ց': 'g', 'հ': 'h', 'ո': 'n', 'օ': 'o', 'զ': 'q', 'ս': 'u', 'ա': 'w',
+  // Latin letters with no accent to drop: 0131 0251 0261 map to one letter; 00F8 0142 0111 map to a letter and a
+  // combining stroke, which skeleton() drops the way it drops any accent.
+  'ı': 'i', 'ɑ': 'a', 'ɡ': 'g', 'ø': 'o', 'ł': 'l', 'đ': 'd'
 };
 
 /**
@@ -846,9 +861,10 @@ const SCRIPTS = ['Latin', 'Cyrillic', 'Greek', 'Armenian', 'Han', 'Hiragana', 'K
   'Hebrew', 'Thai', 'Devanagari', 'Bengali', 'Tamil', 'Telugu', 'Kannada', 'Malayalam', 'Gujarati', 'Gurmukhi',
   'Sinhala', 'Georgian', 'Ethiopic', 'Khmer', 'Lao', 'Myanmar', 'Tibetan', 'Cherokee', 'Thaana', 'Mongolian']
   .map((s) => [s, new RegExp(`\\p{Script=${s}}`, 'u')]);
-// Unicode's "highly restrictive" profile (UTS 39, 5.2): one writing system, or Latin with the ones Japanese, Chinese
-// and Korean are written with alongside it.
-const TOGETHER = [['Latin', 'Han', 'Hiragana', 'Katakana'], ['Latin', 'Han', 'Bopomofo'], ['Latin', 'Han', 'Hangul']];
+// The writing systems with letters drawn like Latin ones (CONFUSABLES). Two of them in one name is how a disguise
+// mixes letters; Latin beside Thai, Devanagari, Han or Hangul has no letter that can pass for another, so it is a
+// name, not a disguise.
+const LOOKALIKE_SCRIPTS = new Set(['Latin', 'Cyrillic', 'Greek', 'Armenian']);
 
 /** The writing systems of a decoded label, and whether they are mixed the way a disguise mixes them. */
 function scriptsOf(name) {
@@ -858,12 +874,12 @@ function scriptsOf(name) {
     found.add((SCRIPTS.find(([, rx]) => rx.test(ch)) || ['Other'])[0]);
   }
   const list = [...found];
-  return { list, mixed: list.length > 1 && !TOGETHER.some((set) => list.every((s) => set.includes(s))) };
+  return { list, mixed: list.filter((s) => LOOKALIKE_SCRIPTS.has(s)).length > 1 };
 }
 
 /**
  * The brand an international label is drawn to look like ("pаypal" with a Cyrillic а is paypal), or null. Exact
- * only: the whole name reads as the brand, or as the brand and a real word joined by a hyphen; the brand has five
+ * only: the whole name reads as the brand, or as the brand and a real word, hyphened or glued on; the brand has five
  * letters or more; at least one letter was changed to get there. No near spellings: an honest name in its own
  * alphabet is never called a misspelling.
  */
@@ -876,8 +892,10 @@ function idnLookalike(label) {
   for (const brand of L.PROTECTED_BRANDS) {
     const t = brand.token;
     if (t.length < 5) continue;
-    const rest = text.startsWith(`${t}-`) ? text.slice(t.length + 1) : text.endsWith(`-${t}`) ? text.slice(0, -t.length - 1) : null;
-    if (text === t || (rest && isRealWords(rest))) return { brand, name, scripts: scriptsOf(name).list };
+    // Joined by a hyphen, or glued on ("paypalsecure"): the same brand-and-word rule brandInfo applies to plain names.
+    const rest = text.startsWith(t) ? text.slice(t.length) : text.endsWith(t) ? text.slice(0, -t.length) : null;
+    const word = rest && (rest.startsWith('-') ? rest.slice(1) : rest.endsWith('-') ? rest.slice(0, -1) : rest.length >= 4 ? rest : '');
+    if (text === t || (word && isRealWords(word))) return { brand, name, scripts: scriptsOf(name).list };
   }
   return null;
 }
@@ -1069,12 +1087,17 @@ function brandInfo(p, popular = popularSites()) {
   // One of the most linked-to sites on the web (see isWellKnown) has a name of its own: elle.com is not Zelle,
   // lacoste.com is not La Poste. Only a spelling near a brand is relieved, never a disguise (see lookAlikeLetters).
   const listed = popular.has(p.registrable) && isWellKnown(p, popular);
+  // The whole name is one word of its own, in English or another language ("telegrams", Italian "telegramma"): a
+  // brand inside it is that word's spelling, not a borrowed name. Not on a risky ending (U24's list) unless the site is
+  // a popular one: there a word that holds a brand is still read as the brand (telegramm.top).
+  const wordsCount = !L.RISKY_TLDS[p.suffix] || popular.has(p.registrable);
+  const oneWord = wordsCount && (ordinaryWords().has(sldFlat) || L.FOREIGN_WORDS.has(sldFlat));
   for (const brand of L.PROTECTED_BRANDS) {
     const t = brand.token;
     // Short or common-word brands ("chase", "apple", "ups") only count as whole
     // words; long distinctive ones ("coinbase", "microsoft") also as substrings.
     const inside = (flat, set) => set.has(t) || (t.length >= substringMin && flat.includes(t));
-    if (!inDomain && inside(sldFlat, words)) inDomain = brand;
+    if (!inDomain && (sldFlat === t || !oneWord) && inside(sldFlat, words)) inDomain = brand;
     // The brand at the start or end, joined to a real word the small built-in list does not know ("paypalresolution",
     // "applebees"): found here, and judged by the word it is joined to (see U22).
     const rest = sldFlat.startsWith(t) ? sldFlat.slice(t.length) : sldFlat.endsWith(t) ? sldFlat.slice(0, -t.length) : '';
@@ -1124,8 +1147,11 @@ function brandInfo(p, popular = popularSites()) {
           // letter: another word ("overdrive", not "onedrive"), which a person reads as a different name. Noted,
           // not treated as a disguise.
           const raw = rawOf.get(part) || part;
-          const real = isRealWords(raw) || L.FOREIGN_WORDS.has(raw.toLowerCase());
-          if (!doubled && real) { if (!wordLike) wordLike = { brand, word: raw }; continue; }
+          const foreign = wordsCount && L.FOREIGN_WORDS.has(raw.toLowerCase());
+          const real = isRealWords(raw) || foreign;
+          // A word in another language that is spelled with the doubled letter ("telegramm", German): read by hand, so
+          // its doubled letter is its own.
+          if ((!doubled && real) || foreign) { if (!wordLike) wordLike = { brand, word: raw }; continue; }
           // "paypai", "robloxx": the same word at a glance. Not "goggles", a real word whose doubled letter is its own.
           const il = (s) => s.replace(/i/g, 'l');
           const eyeTwin = doubled || (part.length === t.length && il(part) === il(t));
@@ -1178,7 +1204,8 @@ function popularCopy(p, sldFlat, popular) {
   if (sites.has(sldFlat)) return sites.get(sldFlat);   // a digit for a letter
   for (const form of new Set([plain, sldFlat])) {
     for (const n of [form.length - 1, form.length, form.length + 1]) {
-      for (const name of byLength.get(n) || []) if (oneEdit(form, name) || swapped(form, name)) return sites.get(name);
+      // The name with an "s" on the end, or without its own ("wikipedias"): how people write the plural, not a copy.
+      for (const name of byLength.get(n) || []) if ((oneEdit(form, name) && form !== `${name}s` && name !== `${form}s`) || swapped(form, name)) return sites.get(name);
     }
   }
   return null;
@@ -1256,7 +1283,8 @@ const FILE_ENDING = /^(pdf|docx?|xlsx?|pptx?|txt|csv|md|js|mjs|cjs|ts|tsx|jsx|js
 /**
  * A link whose words show one site and which opens another: { shown, real, brand }, or null. Words count only when
  * they are themselves an address ("https://www.paypal.com/...", "www.paypal.com", or "paypal.com" written in lower
- * case, so "ASP.NET" and "Node.js" stay names), or name a protected brand that the address imitates (brandInfo).
+ * case, so "ASP.NET" and "Node.js" stay names), name a protected brand that the address imitates (brandInfo), or
+ * hold a protected brand's own address anywhere in them ("Visit PayPal.com"), over a site that is not well known.
  * Silent whenever it cannot tell or both sides are one owner: the same site or a subdomain, one brand's own sites
  * (microsoft.com words over live.com), a shortener or an email service's click counter (the real address is not in
  * the link), a web archive, or a well-known site's page about the shown one ("from?site=github.com").
@@ -1293,7 +1321,6 @@ function shownVersusReal(text, href, wellKnown = null) {
   const info = brandInfo(real);
   if (info.owner) return null;
   const resembled = [info.lookalike, info.inDomain, info.inSubdomain, info.wordLike && info.wordLike.brand].filter(Boolean);
-  if (!resembled.length) return null;
   const single = words.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
   for (const b of resembled) {
     for (let i = 0; i < single.length; i++) {
@@ -1303,6 +1330,12 @@ function shownVersusReal(text, href, wellKnown = null) {
         if (rest.every((w) => CLAIM_WORDS.has(w))) return { shown: b.domains[0], real: real.host, brand: b };
       }
     }
+  }
+  // A protected brand's own address inside a sentence, in any case ("Log in to PayPal.com to confirm"), over a site
+  // that is not well known and not the brand's: the commonest words of a phishing link.
+  for (const tok of words.match(/(?:[a-z0-9-]+\.)+[a-z]{2,24}/gi) || []) {
+    const q = analyze(tok);
+    if (q && L.PROTECTED_BRANDS.some((b) => b.domains.includes(q.registrable))) return { shown: q.host.replace(/^www\./, ''), real: real.host, brand: null };
   }
   return null;
 }
@@ -1486,6 +1519,8 @@ function mash(seg) {
 // hyphens and digits of its encoding. U02 already weighs the encoding itself.
 const shownName = (p) => decodeLabel(p.sld) || p.sld;
 
+// "Latin", "Latin and Cyrillic", "Latin, Cyrillic and Greek".
+const andList = (list) => (list.length > 2 ? `${list.slice(0, -1).join(', ')} and ${list[list.length - 1]}` : list.join(' and '));
 const fail = (points, detail, extra) => ({ status: 'fail', points, detail, extra });
 const warn = (points, detail, extra) => ({ status: 'warn', points, detail, extra });
 const pass = (detail, points = 0) => ({ status: 'pass', points, detail });
@@ -1596,8 +1631,8 @@ const URL_CHECKS = [
       // Latin letters with Cyrillic, Greek or another alphabet inside one name (Unicode's highly restrictive
       // profile, UTS 39): honest names keep to one, or to Latin beside Chinese, Japanese or Korean.
       const mixed = names.map(scriptsOf).find((s) => s.mixed);
-      if (mixed) return fail(30, `Mixes ${mixed.list.join(' and ')} letters in one name`);
-      const written = [...new Set(names.flatMap((n) => scriptsOf(n).list))].join(' and ');
+      if (mixed) return fail(30, `Mixes ${andList(mixed.list)} letters in one name`);
+      const written = andList([...new Set(names.flatMap((n) => scriptsOf(n).list))]);
       // Drawn to read as a brand: U24 names the brand, and the points are its own.
       if (brand.idn) return pass(`Written in ${written} letters; the look-alike check names the brand they copy`);
       return pass(`An international name, written in ${written} letters`);
@@ -1847,7 +1882,8 @@ const URL_CHECKS = [
         return warn(12, `"${brand.wordLike.word}" is spelled like ${home}, but is an ordinary word`);
       }
       if (!brand.lookalike) return pass('No typosquatting');
-      if (brand.idn) return fail(70, `Written in ${brand.idn.scripts.join(' and ')} letters to look like ${brand.lookalike.domains[0]}`);
+      // Latin alone: accents or a changed letter ("paypál"), not another alphabet.
+      if (brand.idn) return fail(70, brand.idn.scripts.join() === 'Latin' ? `Written with altered letters to look like ${brand.lookalike.domains[0]}` : `Written in ${andList(brand.idn.scripts)} letters to look like ${brand.lookalike.domains[0]}`);
       // Nobody accidentally registers a one-letter-off "steamcommunity"; a word
       // one letter off "apple" is far more often innocent.
       const t = brand.lookalike.token;
@@ -3159,8 +3195,8 @@ function loader() {
     return loaded[name].exports;
   };
 }
-async function fetchWords() {
-  const res = await fetch(wordsUrl);
+async function fetchText(url) {
+  const res = await fetch(url);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const bytes = new Uint8Array(await res.arrayBuffer());
   // A host may send it already unpacked (Content-Encoding: gzip); only a gzip file starts 1f 8b.
@@ -3172,11 +3208,12 @@ let engine = null;
 window.SentinelEngine = {
   /**
    * The fast check of one address, here in the browser: the same shape as the server's demo scan, plus local: true.
-   * If the word list could not be fetched, names are not read as words and the result says so (partial: true); the
+   * If the word list or the popular sites could not be fetched, the result says so (partial: true); the
    * next check fetches it again rather than running without it for the rest of the visit.
    */
   scan(raw) {
-    const got = ready || (ready = fetchWords().then((text) => { words = text; return true; }, () => { ready = null; return false; }));
+    const got = ready || (ready = Promise.all([fetchText(wordsUrl), fetchText(popularUrl)])
+      .then(([w, p]) => { words = w; popular = p; return true; }, () => { ready = null; return false; }));
     return got.then((ok) => {
       const v = (ok ? (engine = engine || loader()('./offline')) : loader()('./offline')).scanAddress(raw);
       return ok || !v.ok ? v : { ...v, partial: true };
