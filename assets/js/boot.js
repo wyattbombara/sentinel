@@ -13,10 +13,30 @@ document.documentElement.classList.add('js');
     if (!a) return;
     var v = JSON.parse(localStorage.getItem('sentinel:look-vars') || '{}');
     var s = m === 'light' || m === 'dark' ? m : matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
-    if (v.accent !== a || !v[s]) return;
+    if (!/^[a-z]+$/.test(a)) return;
     r.setAttribute('data-accent', a);
+    // v is look.js's WEB_V: a set kept by an older Sentinel lacks the newer names, and drawn as it is it paints a page half
+    // in the old look. It is left undrawn (gold, never a mixture; the name above is all the scripts need); look-site.js
+    // works the new set out once the page is in.
+    if (v.accent !== a || v.v !== 3 || !v[s]) return;
     for (var k in v[s]) if (/^--[a-z0-9-]+$/.test(k)) r.style.setProperty(k, v[s][k]);
   } catch (e) { /* storage blocked: gold, as the system has it */ }
+})();
+
+/*
+ * A first visit's Overview waits on the first-run choices (their script and stylesheet), which app.js asks for once it
+ * has run: asked for here, beside app.js, so they are on the way when it wants them. Nothing after the first visit, in
+ * the Windows app (it opens Settings' files instead), or on any other page. The key is app.js's FIRST_KEY.
+ */
+(function () {
+  try {
+    if (location.pathname.replace(/\/$/, '') !== '/app' || window.sentinelDesktop || localStorage.getItem('sentinel:first-choices')) return;
+    [['script', '/assets/js/app/first.js'], ['style', '/assets/css/settings.css']].forEach(function (f) {
+      var l = document.createElement('link');
+      l.rel = 'preload'; l.as = f[0]; l.href = f[1];
+      document.head.appendChild(l);
+    });
+  } catch (e) { /* storage blocked: app.js asks for them itself */ }
 })();
 
 /*

@@ -37,10 +37,10 @@ const BRANDS = [
   { token: 'venmo', domains: ['venmo.com'] },
   { token: 'zelle', domains: ['zellepay.com', 'zelle.com'] },
   { token: 'cashapp', domains: ['cash.app', 'square.com', 'squareup.com'] },
-  // A brand's own name on a generic ending (stripe.dev, dropbox.design, spotify.design) is its developer, design or
+  // A brand's own name on a generic ending (stripe.dev, dropbox.tech, spotify.design) is its developer, design or
   // engineering site. Listed one by one, and only the ones proven the brand's own (scripts/brand-proof.js, run by
   // .github/workflows/brand-proof.yml on every change here): any other stays borrowed.
-  { token: 'stripe', domains: ['stripe.com', 'stripe.network', 'stripe.dev'] },
+  { token: 'stripe', domains: ['stripe.com', 'stripe.network', ...cc('stripe', ['dev', 'press'])] },
   { token: 'wise', domains: ['wise.com', 'transferwise.com'] },
   { token: 'revolut', domains: ['revolut.com', 'revolut.me'] },
   { token: 'chase', domains: ['chase.com', 'chase.co.uk', 'jpmorganchase.com', 'jpmorgan.com'] },
@@ -72,14 +72,14 @@ const BRANDS = [
   { token: 'office365', domains: ['office.com', 'office365.com', 'microsoft.com'] },
   { token: 'onedrive', domains: ['onedrive.com', 'live.com', 'microsoft.com', 'sharepoint.com'] },
   { token: 'sharepoint', domains: ['sharepoint.com', 'microsoft.com'] },
-  { token: 'google', domains: [...cc('google', GOOGLE_CC), 'googleapis.com', 'gstatic.com', 'googleusercontent.com', 'googlevideo.com', 'withgoogle.com', 'googlemail.com', 'goo.gl', 'g.co', 'gmail.com', 'youtube.com', 'google', 'google.dev'] },
+  { token: 'google', domains: [...cc('google', GOOGLE_CC), 'googleapis.com', 'gstatic.com', 'googleusercontent.com', 'googlevideo.com', 'withgoogle.com', 'googlemail.com', 'goo.gl', 'g.co', 'gmail.com', 'youtube.com', 'google', ...cc('google', ['dev', 'org'])] },
   { token: 'gmail', domains: ['gmail.com', 'google.com'] },
   { token: 'youtube', domains: ['youtube.com', 'youtu.be', 'ytimg.com', 'youtube-nocookie.com'] },
   { token: 'amazon', domains: [...cc('amazon', AMAZON_CC), 'amazonaws.com', 'amazon.dev', 'a2z.com', 'amzn.to', 'media-amazon.com', 'primevideo.com', 'aboutamazon.com', 'amazonpay.com', 'amazon.jobs', 'amazon.science'] },
   { token: 'netflix', domains: ['netflix.com', 'nflxext.com', 'nflximg.net', 'netflix.net', 'netflix.shop'] },
   { token: 'spotify', domains: ['spotify.com', 'spotify.link', 'scdn.co', 'spoti.fi', 'spotify.design'] },
   { token: 'adobe', domains: ['adobe.com', 'adobe.io', 'adobelogin.com', 'typekit.net'] },
-  { token: 'dropbox', domains: ['dropbox.com', 'dropboxmail.com', 'dropboxusercontent.com', 'db.tt', 'dropbox.design'] },
+  { token: 'dropbox', domains: ['dropbox.com', 'dropboxmail.com', 'dropboxusercontent.com', 'db.tt', ...cc('dropbox', ['tech', 'design'])] },
   { token: 'docusign', domains: ['docusign.com', 'docusign.net'] },
   // Link shorteners: a page named for one pretends to be a short link you can trust to forward you.
   { token: 'tinyurl', domains: ['tinyurl.com'] },
@@ -126,13 +126,13 @@ const BRANDS = [
   { token: 'workday', domains: ['workday.com', 'myworkday.com', 'workdaysuite.com'] },
   { token: 'wetransfer', domains: ['wetransfer.com', 'we.tl'] },
   { token: 'zoom', domains: ['zoom.us', 'zoom.com', 'zoomgov.com'] },
-  { token: 'openai', domains: ['openai.com', 'chatgpt.com', 'oaistatic.com'] },
+  { token: 'openai', domains: ['openai.com', 'chatgpt.com', 'oaistatic.com', 'openai.fund'] },
   { token: 'chatgpt', domains: ['chatgpt.com', 'openai.com'] },
   { token: 'anthropic', domains: ['anthropic.com', 'claude.ai', 'claude.com'] },
   { token: 'deepseek', domains: ['deepseek.com'] },
 
   // Social
-  { token: 'facebook', domains: ['facebook.com', 'fb.com', 'fb.me', 'fbcdn.net', 'messenger.com', 'meta.com', 'facebook.net', 'facebookmail.com'] },
+  { token: 'facebook', domains: ['facebook.com', 'fb.com', 'fb.me', 'fbcdn.net', 'messenger.com', 'meta.com', 'facebook.net', 'facebookmail.com', 'facebook.design'] },
   { token: 'instagram', domains: ['instagram.com', 'cdninstagram.com', 'ig.me'] },
   { token: 'whatsapp', domains: ['whatsapp.com', 'whatsapp.net', 'wa.me'] },
   { token: 'linkedin', domains: ['linkedin.com', 'lnkd.in', 'licdn.com'] },
@@ -145,7 +145,7 @@ const BRANDS = [
   // Shopping and delivery
   { token: 'ebay', domains: cc('ebay', EBAY_CC).concat(['ebayimg.com', 'ebaystatic.com']) },
   { token: 'walmart', domains: ['walmart.com', 'walmart.ca', 'walmartimages.com'] },
-  { token: 'shopify', domains: ['shopify.com', 'myshopify.com', 'shopifycdn.com'] },
+  { token: 'shopify', domains: ['shopify.com', 'myshopify.com', 'shopifycdn.com', 'shopify.engineering'] },
   { token: 'shopee', domains: ['shopee.com', 'shopee.co.id', 'shopee.com.my', 'shopee.sg', 'shopee.ph', 'shopee.vn', 'shopee.co.th', 'shopee.tw', 'shopee.com.br'] },
   { token: 'aliexpress', domains: ['aliexpress.com', 'aliexpress.us', 'alicdn.com'] },
   { token: 'temu', domains: ['temu.com'] },
@@ -182,7 +182,7 @@ const BRANDS = [
   // Telecom
   { token: 'comcast', domains: ['comcast.com', 'comcast.net', 'xfinity.com'] },
   { token: 'xfinity', domains: ['xfinity.com', 'comcast.com', 'comcast.net'] },
-  { token: 'verizon', domains: ['verizon.com', 'verizonwireless.com', 'vzw.com'] },
+  { token: 'verizon', domains: ['verizon.com', 'verizonwireless.com', 'vzw.com', 'verizon.net'] },
   { token: 'tmobile', domains: ['t-mobile.com', 'tmobile.com'] },
 
   // Crypto
@@ -1088,10 +1088,12 @@ function brandInfo(p, popular = popularSites()) {
   // lacoste.com is not La Poste. Only a spelling near a brand is relieved, never a disguise (see lookAlikeLetters).
   const listed = popular.has(p.registrable) && isWellKnown(p, popular);
   // The whole name is one word of its own, in English or another language ("telegrams", Italian "telegramma"): a
-  // brand inside it is that word's spelling, not a borrowed name. Not on a risky ending (U24's list) unless the site is
-  // a popular one: there a word that holds a brand is still read as the brand (telegramm.top).
+  // brand inside it is that word's spelling, not a borrowed name. That holds on a risky ending too: the ending alone is
+  // one sign, and a word needs a second (a doubled letter, "login" in front) before it reads as the brand.
+  const oneWord = ordinaryWords().has(sldFlat) || L.FOREIGN_WORDS.has(sldFlat);
+  // A foreign word spelled with the brand's letter doubled ("telegramm") is the typing slip a copy uses. Off a risky
+  // ending, or on a popular site, it is the word; on a risky ending it is that second sign (telegramm.top).
   const wordsCount = !L.RISKY_TLDS[p.suffix] || popular.has(p.registrable);
-  const oneWord = wordsCount && (ordinaryWords().has(sldFlat) || L.FOREIGN_WORDS.has(sldFlat));
   for (const brand of L.PROTECTED_BRANDS) {
     const t = brand.token;
     // Short or common-word brands ("chase", "apple", "ups") only count as whole
